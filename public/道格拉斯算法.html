@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>道格拉斯-普克算法</title>
+
+		<style type="text/css">
+			.buttons {
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 12%;
+				width: 70px;
+				margin-left: 70px;
+			}
+			
+			.buttons:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+
+			.radios {
+				background-color: white;
+				margin-left: 70px;
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; width: 900px; text-align: center; background-color: cyan; font-family: '楷体';">道格拉斯-普克算法数据压缩</h1>
+		<p style="margin-right: 20px; float: right; font-style: italic;"><small>By 10170313</small></p>
+		<br>
+		<div style="width: 1002px; margin: 0 auto;">
+			<input id="fileRead" type="file" style="visibility: hidden; position: absolute;" onchange="getPoints()">
+			<button type="button" class="buttons" onclick="fileRead.click()">加载</button>
+			<p id="compression" style="display: inline; margin-left: 70px;">压缩率： %</p>
+			<button type="button" disabled="disabled" class="buttons" name="radios" onclick="getAfterPolygons()">压缩</button>
+			<p style="display: inline; margin-left: 70px;">阈值：</p>
+			<input id="maxdis" type="text" value="3066" style="width: 70px;" onchange="setTolerance(this.value)">
+			<input type="radio" disabled="disabled" class="radios" name="radios" value="before" checked="checked" onclick="setValue(this.value)">压缩前
+			<input type="radio" disabled="disabled" class="radios" name="radios" value="after" onclick="setValue(this.value)">压缩后
+		</div>
+		<div style="width: 802px; margin: 10px auto;">
+			<canvas id="map" width="800" height="600" style="background-color: white; border: 1px solid black;"></canvas>
+		</div>
+
+		<script type="text/javascript">
+			//全局变量的设置
+			function mapPoint(x, y) {
+				this.x = x;
+				this.y = y;
+			}
+
+			function tempPoint(del, x, y) {
+				this.del = del;
+				this.x = x;
+				this.y = y;
+			}
+
+			function Polygon(number, points) {
+				this.number = number;
+				this.points = points;
+			}
+
+			var polygonsBefore = new Array();
+			var polygonsAfter = new Array();
+			var change = "before";
+			var tolerance = document.getElementById('maxdis').value;
+			var lastTolerance = 0;
+
+			var canva = document.getElementById('map');
+			var cxt = canva.getContext('2d');
+			cxt.translate(-550, -50);
+			var isDraw = false;
+		</script>
+
+		<script type="text/javascript">
+			function getPoints() {
+				var file = document.getElementById('fileRead').files[0];
+				var reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str = reader.result;
+					var numcharacter = "";
+					var x = 0,
+						y = 0;
+					var flag = 0;
+					var number = 0;
+					var character = str[flag];
+					var pointTemp = new mapPoint(0, 0);
+					var pointsTemp = new Array();
+					while (character != null) {
+						if (character == "E") {
+							flag += 5;
+							character = str[flag];
+						} else {
+							while (character != "\n") {
+								numcharacter += character;
+								character = str[++flag];
+							}
+							number = parseInt(numcharacter);
+							numcharacter = "";
+							character = str[++flag];
+							while (character != "E") {
+								while (character != ",") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointTemp.x = parseFloat(numcharacter);
+								numcharacter = "";
+								while (character != "\n") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointTemp.y = parseFloat(numcharacter);
+								numcharacter = "";
+								pointsTemp.push(JSON.parse(JSON.stringify(pointTemp)));
+							}
+						}
+						var points = pointsTemp.slice();
+						var polygon = new Polygon(number, points);
+						polygonsBefore.push(polygon);
+						pointsTemp.splice(0, pointsTemp.length);
+						flag += 5;
+						character = str[flag];
+					}
+					polygonsBefore.pop();
+					draw();
+					var obj=document.getElementsByName('radios');
+					for(var i=0;i<obj.length;i++){
+						obj[i].disabled=false;
+					}
+				}
+			}
+
+			function setValue(value) {
+				change = value;
+				draw();
+			}
+
+			function setTolerance(value) {
+				tolerance = value;
+			}
+
+			function getAfterPolygons() {
+				if (lastTolerance != tolerance) {
+					if (polygonsAfter.length != 0) {
+						polygonsAfter.splice(0, polygonsAfter.length);
+					}
+					var N = polygonsBefore.length;
+					for (var i = 0; i < N; i++) {
+						var n = polygonsBefore[i].points.length;
+						if (polygonsBefore[i].points[0].x != polygonsBefore[i].points[n - 1].x||
+						(polygonsBefore[i].points[0].x == polygonsBefore[i].points[n - 1].x&&
+						polygonsBefore[i].points[0].y != polygonsBefore[i].points[n - 1].y)) {
+							var number = polygonsBefore[i].number;
+							var poistemp = new Array();
+							var poideltemp = new Array();
+							for (var j = 0; j < n; j++) {
+								var poiWithDel = new tempPoint(false, 0, 0);
+								poiWithDel.x = polygonsBefore[i].points[j].x;
+								poiWithDel.y = polygonsBefore[i].points[j].y;
+								poideltemp.push(JSON.parse(JSON.stringify(poiWithDel)));
+							}
+							DouglasPeucker(poideltemp, 0, poideltemp.length - 1);
+							for (var j = 0; j < n; j++) {
+								if (poideltemp[j].del == false) {
+									var poiSave = new mapPoint(0, 0);
+									poiSave.x = poideltemp[j].x;
+									poiSave.y = poideltemp[j].y;
+									poistemp.push(poiSave);
+								}
+							}
+							var points = poistemp.slice();
+							poistemp.slice(0, poistemp.length);
+							var polygon = new Polygon(number, points);
+							polygonsAfter.push(JSON.parse(JSON.stringify(polygon)));
+						} else {
+							var poistemp = new Array();
+							var number = polygonsBefore[i].number;
+							var cut = getCutNumber(polygonsBefore[i].points);
+							var poistemp1 = new Array();
+							for (var j = 0; j < cut; j++) {
+								var poiWithDel = new tempPoint(false, 0, 0);
+								poiWithDel.x = polygonsBefore[i].points[j].x;
+								poiWithDel.y = polygonsBefore[i].points[j].y;
+								poistemp1.push(JSON.parse(JSON.stringify(poiWithDel)));
+							}
+							var poistemp2 = new Array();
+							for (var j = cut; j < n; j++) {
+								var poiWithDel = new tempPoint(false, 0, 0);
+								poiWithDel.x = polygonsBefore[i].points[j].x;
+								poiWithDel.y = polygonsBefore[i].points[j].y;
+								poistemp2.push(JSON.parse(JSON.stringify(poiWithDel)));
+							}
+							DouglasPeucker(poistemp1, 0, poistemp1.length - 1);
+							DouglasPeucker(poistemp2, 0, poistemp2.length - 1);
+							for (var j = 0; j < poistemp1.length; j++) {
+								if (poistemp1[j].del == false) {
+									var poiSave = new mapPoint(0, 0);
+									poiSave.x = poistemp1[j].x;
+									poiSave.y = poistemp1[j].y;
+									poistemp.push(JSON.parse(JSON.stringify(poiSave)));
+								}
+							}
+							for (var j = 0; j < poistemp2.length; j++) {
+								if (poistemp2[j].del == false) {
+									var poiSave = new mapPoint(0, 0);
+									poiSave.x = poistemp2[j].x;
+									poiSave.y = poistemp2[j].y;
+									poistemp.push(JSON.parse(JSON.stringify(poiSave)));
+								}
+							}
+							var points = poistemp.slice();
+							poistemp.splice(0, poistemp.length);
+							var polygon = new Polygon(number, points);
+							polygonsAfter.push(polygon);
+						}
+					}
+					lastTolerance = tolerance;
+					setCompressionRatio();
+					draw();
+				}
+			}
+
+			function draw() {
+				if (isDraw == true) {
+					cxt.clearRect(550, 50, canva.width, canva.height);
+				}
+				if (change == "before") {
+					var N = polygonsBefore.length;
+					for (var i = 0; i < N; i++) {
+						var n = polygonsBefore[i].points.length;
+						cxt.beginPath();
+						cxt.moveTo(polygonsBefore[i].points[0].x * 0.0001 + 950, canva.height - (polygonsBefore[i].points[0].y * 0.0001 -
+							80));
+						for (var j = 1; j < n; j++) {
+							cxt.lineTo(polygonsBefore[i].points[j].x * 0.0001 + 950, canva.height - (polygonsBefore[i].points[j].y * 0.0001 -
+								80));
+						}
+						cxt.stroke();
+						cxt.beginPath();
+					}
+				}
+				if (change == "after") {
+					var N = polygonsAfter.length;
+					for (var i = 0; i < N; i++) {
+						var n = polygonsAfter[i].points.length;
+						cxt.beginPath();
+						cxt.moveTo(polygonsAfter[i].points[0].x * 0.0001 + 950, canva.height - (polygonsAfter[i].points[0].y * 0.0001 -
+							80));
+						for (var j = 1; j < n; j++) {
+							cxt.lineTo(polygonsAfter[i].points[j].x * 0.0001 + 950, canva.height - (polygonsAfter[i].points[j].y * 0.0001 -
+								80));
+						}
+						cxt.stroke();
+						cxt.beginPath();
+					}
+				}
+				isDraw = true;
+			}
+
+			function getCutNumber(points) {
+				var dismax = 0;
+				var temp = 0;
+				var n = points.length;
+				for (var i = 1; i < n; i++) {
+					var dx = points[i].x - points[0].x;
+					var dy = points[i].y - points[0].y;
+					var dis = Math.sqrt(dx * dx + dy * dy);
+					if (dis > dismax) {
+						dismax = dis;
+						temp = i;
+					}
+				}
+				return temp;
+			}
+
+			function DouglasPeucker(points, start, end) {
+				if (end - start == 1) {
+					return 0;
+				}
+				var distance = 0;
+				var temp = 0;
+				for (var i = start + 1; i < end - 1; i++) {
+					var distemp = distanceToLine(points[start].x, points[start].y, points[end].x, points[end].y, points[i].x, points[i]
+						.y);
+					if (distemp > distance) {
+						distance = distemp;
+						temp = i;
+					}
+				}
+				if (distance <= tolerance) {
+					for (var i = start + 1; i < end - 1; i++) {
+						points[i].del = true;
+					}
+					return 0;
+				} else {
+					DouglasPeucker(points, start, temp);
+					DouglasPeucker(points, temp + 1, end);
+				}
+			}
+
+			function distanceToLine(x1, y1, x2, y2, x0, y0) {
+				var A = y2 - y1;
+				var B = x1 - x2;
+				var C = x2 * y1 - x1 * y2;
+				var dis = Math.abs(A * x0 + B * y0 + C) / Math.sqrt(A * A + B * B);
+				return dis;
+			}
+
+			function setCompressionRatio() {
+				var numBefore = 0;
+				var numAfter = 0;
+				var comp = 0;
+
+				for (var i = 0; i < polygonsBefore.length; i++) {
+					numBefore += polygonsBefore[i].points.length;
+				}
+				for (var i = 0; i < polygonsAfter.length; i++) {
+					numAfter += polygonsAfter[i].points.length;
+				}
+				comp = ((numBefore - numAfter) / numBefore * 100).toFixed(2);
+
+				var obj = document.getElementById('compression');
+				obj.innerHTML = "压缩率：" + comp.toString() + " %";
+			}
+		</script>
+	</body>
+</html>
