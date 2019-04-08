@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>变换</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width,initial-scale=1.0">
+		<style type="text/css">
+			#div1 {
+				margin: 0 auto;
+				background-color: blue;
+				font-size: 20px;
+				width: 55%;
+				text-align: center;
+			}
+
+			.span1 {
+				background-color: cyan;
+				width: 65px;
+				display: inline-block;
+				margin-left: 20px;
+				margin-right: 20px;
+			}
+
+			#div2 {
+				margin: 0 auto;
+				font-size: 15px;
+				width: 80%;
+			}
+
+			.span2 {
+				width: 24.5%;
+				display: inline-block;
+			}
+		</style>
+	</head>
+	<body>
+		<p style="text-align: center;font-size: 25px; font-family: 楷体;">请上传文件,并在选择变换方式后点击刷新按钮</p>
+		<div id="div1">
+			<span class="span1"><input type="radio" class="radio" name="change" value="normal" onclick="getValue(this.value)">正常</span>
+			<span class="span1"><input type="radio" class="radio" name="change" value="rotate" onclick="getValue(this.value)">旋转</span>
+			<span class="span1"><input type="radio" class="radio" name="change" value="rightSlant" onclick="getValue(this.value)">左斜</span>
+			<span class="span1"><input type="radio" class="radio" name="change" value="shrug" onclick="getValue(this.value)">耸肩</span>
+			<span class="span1"><input type="radio" class="radio" name="change" value="move" onclick="getValue(this.value)">平移</span>
+			<span class="span1"><input type="radio" class="radio" name="change" value="boost" onclick="getValue(this.value)">放大</span>
+			<span class="span1"><input type="radio" class="radio" name="change" value="symmetry" onclick="getValue(this.value)">对称</span>
+		</div>
+		<br>
+		<div style="margin: 0 auto;width: 80%;">
+			<span style="width: 50%;float: left;"><canvas style="margin: 0 auto;" id="myCanvas1" width="500" height="500"></canvas></span>
+			<span style="width: 50%;float: right;"><canvas style="margin: 0 auto;" id="myCanvas2" width="500" height="500"></canvas></span>
+		</div>
+		<br>
+		<div id="div2">
+			<span class="span2"><input style="float: left;" id="fileInput1" type="file" onchange="processFiles(file1,character1)"></span>
+			<span class="span2"><button style="float: left;" type="button" onclick="draw(canvas1,charactertemp1)">刷新</button></span>
+			<!--上传文件，文件改变时运行processFiles函数-->
+			<span class="span2"><input style="float: left;" id="fileInput2" type="file" onchange="processFiles(file2,character2)"></span>
+			<!--上传文件，文件改变时运行processFiles函数-->
+			<span class="span2"><button style="float: left;" type="button" onclick="draw(canvas2,charactertemp2)">刷新</button></span>
+		</div>
+		<p style="width: 80%;"><small style="float: right;">By 10170313</small></p>
+		<script type="text/javascript">
+			//放置全局变量
+			var canvas1 = document.getElementById('myCanvas1');
+			var canvas2 = document.getElementById('myCanvas2');
+			var file1 = document.getElementById('fileInput1');
+			var file2 = document.getElementById('fileInput2');
+
+			//存储单个字符,其中包含变量名,对应的变换形式和字符的点数据
+			function character(name, type, points) {
+				this.name = name;
+				this.type = type;
+				this.points = points;
+			}
+			var character1 = new character();
+			character1.name = "ch1";
+			var character2 = new character();
+			character2.name = "ch2";
+			var charactertemp1 = new character();
+			charactertemp1.name = "cht1";
+			var charactertemp2 = new character();
+			charactertemp2.name = "cht2";
+		</script>
+		<script>
+			//设置传入字符的变换形式
+			function getValue(value) {
+				character1.type = value;
+				character2.type = value;
+			}
+
+			//绘制网格函数
+			function grid(canva) {
+				var x, y;
+				var canvas = canva;
+				var cxt = canvas.getContext('2d');
+				cxt.beginPath();
+				cxt.lineWidth = 1;
+				for (y = 0; y <= 500; y += 20) {
+					cxt.moveTo(0, y);
+					cxt.lineTo(500, y);
+					for (x = 0; x <= 500; x += 20) {
+						cxt.moveTo(x, 0);
+						cxt.lineTo(x, 500);
+					}
+				}
+				cxt.stroke();
+			}
+			//调用并绘制网格
+			grid(canvas1);
+			grid(canvas2);
+		</script>
+		<script>
+			function processFiles(fileInput, cha) {
+				var file = fileInput.files[0]; //获取文件
+				var reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str = this.result; //读取文本
+					var pois = new Array();
+					var numcharacter = ""; //存储数字字符
+					var i = 0;
+					var flag = 0; //str字符串当前标记
+					var character = str[flag]; //获取字符串的一个字符
+					//逐字符读取字符串str,并将数字以数的形式存储至number中，每一个线段用-1隔开
+					while (character != null) {
+						//避免一开始读到"END",即为了避免读入.gen文件的最后一个"END"
+						if (character == "E") {
+							flag += 5; //跳过字符N、D和回车,到达下一行的起始
+							character = str[flag];
+						} else {
+							//跳过每段线段的标号
+							while (character != "\n") {
+								character = str[++flag];
+							}
+							character = str[++flag];
+							//在每条线段结束标志前,每循环一次读取一行数据
+							while (character != "E") {
+								//读取","前的数字,即X
+								while (character != ",") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pois.push(parseFloat(numcharacter)); //将字符转化为浮点数并存进数组
+								numcharacter = ""; //置空,以便重新读入字符
+								//读取"\n"前的数字,即Y
+								while (character != "\n") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pois.push(parseFloat(numcharacter)); //将字符转化为浮点数并存进数组
+								numcharacter = ""; //置空,以便重新读入字符
+							}
+							pois.push(-1); //读至每条线段的结束标记"END"时,存入-1表示一条线段结束
+							flag += 5; //跳至下一行起始
+							character = str[flag];
+						}
+					}
+					cha.type = "normal"; //初始变换设置为无变换
+					cha.points = JSON.parse(JSON.stringify(pois)); //深拷贝点数据
+					//若传入字符对应画布一,为字符一暂存对象赋值
+					if (cha.name == "ch1") {
+						charactertemp1 = JSON.parse(JSON.stringify(character1));
+						charactertemp1.name = "cht1";
+						draw(canvas1, charactertemp1);
+					}
+					//若传入字符对应画布二,为字符二暂存对象赋值
+					if (cha.name == "ch2") {
+						charactertemp2 = JSON.parse(JSON.stringify(character2));
+						charactertemp2.name = "cht2";
+						draw(canvas2, charactertemp2);
+					}
+				}
+			}
+
+			function draw(myCanva, cha) {
+				var canvas = myCanva; //获取画布元素
+				var cxt = canvas.getContext('2d'); //getContext("2d") 对象是内建的 HTML5 对象，拥有多种绘制路径、矩形、圆形、字符以及添加图像的方法
+				cxt.clearRect(0, 0, canvas.width, canvas.height);
+				grid(canvas);
+				cxt.beginPath();
+				cxt.lineWidth = 3;
+				var n = cha.points.length; //获取数字的数目
+				var x = new Array();
+				var y = new Array(); //x和y只存放一条线段中的点
+				var j = 0;
+
+				//对于每个字符,若暂存字符与读入字符的变换形式不同则将暂存字符恢复至读入时的初始值,反之则达到某些变换的连续变换效果
+				if (cha.name == "cht1") {
+					if (cha.type != character1.type) {
+						cha = JSON.parse(JSON.stringify(character1));
+						cha.name = "cht1";
+					}
+				}
+				if (cha.name == "cht2") {
+					if (cha.type != character2.type) {
+						cha = JSON.parse(JSON.stringify(character2));
+						cha.name = "cht2";
+					}
+				}
+
+				//无变换
+				if (cha.type == "normal") {
+					for (var i = 0; i < n; i++) {
+						if (cha.points[i] != -1) {
+							x[j] = 90 + cha.points[i] * 20;
+							y[j] = 90 + (320 - (cha.points[++i] * 20));
+							j++;
+						} else {
+							cxt.moveTo(x[0], y[0]);
+							for (var k = 1; k < j; k++) {
+								cxt.lineTo(x[k], y[k]); //线条结束坐标					
+							}
+							cxt.stroke();
+							j = 0;
+						}
+					}
+				}
+
+				//旋转变换,每次旋转顺时针5°
+				if (cha.type == "rotate") {
+					for (var i = 0; i < n; i++) {
+						if (cha.points[i] != -1) {
+							x[j] = 90 + cha.points[i] * 20;
+							y[j] = 90 + (320 - (cha.points[++i] * 20));
+							var tempX = 250 + ((x[j] - 250) * Math.cos(5 * Math.PI / 180) - (y[j] - 250) * Math.sin(5 * Math.PI / 180));
+							var tempY = 250 + ((x[j] - 250) * Math.sin(5 * Math.PI / 180) + (y[j] - 250) * Math.cos(5 * Math.PI / 180));
+							x[j] = tempX;
+							y[j] = tempY;
+							//将旋转后的数据保存下来以便连续变换
+							cha.points[i - 1] = (x[j] - 90) / 20;
+							cha.points[i] = -((y[j] - 410) / 20);
+							j++;
+						} else {
+							cxt.moveTo(x[0], y[0]);
+							for (var k = 1; k < j; k++) {
+								cxt.lineTo(x[k], y[k]); //线条结束坐标					
+							}
+							cxt.stroke();
+							j = 0;
+						}
+					}
+				}
+
+				//左斜变换
+				if (cha.type == "rightSlant") {
+					for (var i = 0; i < n; i++) {
+						if (cha.points[i] != -1) {
+							x[j] = 90 + cha.points[i] * 20;
+							y[j] = 90 + (320 - (cha.points[++i] * 20));
+							x[j] += (-Math.tan(15 * Math.PI / 180)) * y[j]; //X的变换值与与对应的Y值有关
+							j++;
+						} else {
+							cxt.moveTo(x[0], y[0]);
+							for (var k = 1; k < j; k++) {
+								cxt.lineTo(x[k], y[k]); //线条结束坐标					
+							}
+							cxt.stroke();
+							j = 0;
+						}
+					}
+				}
+
+				//耸肩变换
+				if (cha.type == "shrug") {
+					for (var i = 0; i < n; i++) {
+						if (cha.points[i] != -1) {
+							x[j] = 90 + cha.points[i] * 20;
+							y[j] = 90 + (320 - (cha.points[++i] * 20)); //Y的变换值与对应的X有关
+							y[j] += (-0.2) * x[j];
+							j++;
+						} else {
+							cxt.moveTo(x[0], y[0]);
+							for (var k = 1; k < j; k++) {
+								cxt.lineTo(x[k], y[k]); //线条结束坐标					
+							}
+							cxt.stroke();
+							j = 0;
+						}
+					}
+				}
+
+				//平移
+				if (cha.type == "move") {
+					for (var i = 0; i < n; i++) {
+						if (cha.points[i] != -1) {
+							x[j] = 110 + cha.points[i] * 20;
+							y[j] = 90 + (320 - (cha.points[++i] * 20));
+							//将平移后的数据保存下来以便连续变换
+							cha.points[i - 1] = (x[j] - 90) / 20;
+							cha.points[i] = -((y[j] - 410) / 20);
+							j++;
+						} else {
+							cxt.moveTo(x[0], y[0]);
+							for (var k = 1; k < j; k++) {
+								cxt.lineTo(x[k], y[k]); //线条结束坐标					
+							}
+							cxt.stroke();
+							j = 0;
+						}
+					}
+				}
+
+				//放大变换
+				if (cha.type == "boost") {
+					for (var i = 0; i < n; i++) {
+						if (cha.points[i] != -1) {
+							x[j] = 90 + ((cha.points[i] - 8) * 1.1 + 8) * 20;
+							y[j] = 90 + (320 - (((cha.points[++i] - 8) * 1.1 + 8) * 20));
+							//将放大后的数据保存下来以便连续变换
+							cha.points[i - 1] = (cha.points[i - 1] - 8) * 1.1 + 8;
+							cha.points[i] = (cha.points[i] - 8) * 1.1 + 8;
+							j++;
+						} else {
+							cxt.moveTo(x[0], y[0]);
+							for (var k = 1; k < j; k++) {
+								cxt.lineTo(x[k], y[k]); //线条结束坐标					
+							}
+							cxt.stroke();
+							j = 0;
+						}
+					}
+				}
+				
+				//对称变换
+				if(cha.type=="symmetry"){
+					for (var i = 0; i < n; i++) {
+						if (cha.points[i] != -1) {
+							x[j] = 90 + cha.points[++i] * 20;
+							y[j] = 90 + (320 - (cha.points[i-1] * 20));
+							j++;
+						} else {
+							cxt.moveTo(x[0], y[0]);
+							for (var k = 1; k < j; k++) {
+								cxt.lineTo(x[k], y[k]); //线条结束坐标					
+							}
+							cxt.stroke();
+							j = 0;
+						}
+					}
+				}
+				
+				//将全局对象与函数内的值同步
+				if (cha.name == "cht1") {
+					charactertemp1 = JSON.parse(JSON.stringify(cha));
+				}
+				if (cha.name == "cht2") {
+					charactertemp2 = JSON.parse(JSON.stringify(cha));
+				}
+			}
+		</script>
+	</body>
+</html>
