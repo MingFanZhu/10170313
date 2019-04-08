@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>编码</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width,initial-scale=1.0">
+	</head>
+	<body>
+		<p>请上传文件</p>
+		<canvas id="myCanvas1" width="320" height="320"></canvas>
+		<canvas id="myCanvas2" width="320" height="320"></canvas>
+		<br>
+		<input id="fileInput1" type="file" onchange="processFiles(fileInput1,myCanvas1)">
+		<!--上传文件，文件改变时运行processFiles函数-->
+		<input id="fileInput2" type="file" onchange="processFiles(fileInput2,myCanvas2)">
+		<!--上传文件，文件改变时运行processFiles函数-->
+		<script>
+			//绘制格网
+			function grid(myCanvas) {
+				var x, y;
+				var canvas = myCanvas;
+				var cxt = canvas.getContext('2d');
+				cxt.beginPath();
+				cxt.lineWidth = 1;
+				for (y = 0; y <= 320; y += 20) {
+					cxt.moveTo(0, y);
+					cxt.lineTo(320, y);
+					for (x = 0; x <= 320; x += 20) {
+						cxt.moveTo(x, 0);
+						cxt.lineTo(x, 320);
+					}
+				}
+				cxt.stroke();
+			}
+			//调用并绘制网格
+			var canvas1 = document.getElementById('myCanvas1');
+			var canvas2 = document.getElementById('myCanvas2');
+			grid(canvas1);
+			grid(canvas2);
+		</script>
+		<script>
+			//读取文件并在对应的画布上绘制
+			function processFiles(fileInput, myCanvas) {
+				//在每次绘制前清除画布并重绘格网
+				var canvas = myCanvas;
+				var cxt = canvas.getContext('2d');
+				cxt.clearRect(0, 0, canvas.width, canvas.height);
+				grid(canvas);
+
+				var file = fileInput.files[0]; //获取文件
+				var reader = new FileReader();
+				reader.readAsText(file); //以txt格式打开文件
+				//当成功读取时执行函数e
+				reader.onload = function(e) {
+					var str = this.result; //读取文本
+					var number = new Array(); //存放数字的数组
+					number = digitalExtraction(str, number); //提取数字并存入数组
+					draw(number, myCanvas); //画图
+				}
+			}
+			
+			//提取数字，并存入数组
+			function digitalExtraction(str, number) {
+				var heap = str; //获取文本文件字符串
+				var numcharacter = ""; //存储数字字符
+				var number = new Array(); //提取数字数组
+				var i = 0; //数字数组的下标
+				var flag = 0; //heap字符串当前标记
+				var character = heap[flag]; //获取字符串的一个字符
+				//逐字符读取字符串heap,并将数字以数的形式存储至number中，每一个线段用-1隔开，主要过滤掉回车符、"end"、","和"L"，并将字符转化为数字
+				while (character != null) {
+					//避免一开始读到"END",即为了避免读入.gen文件的最后一个"END"
+					if (character == "E") {
+						flag += 5; //跳过字符N、D和回车,到达下一行的起始
+						character = heap[flag]; //读入字符
+					} else {
+						//跳过每段线段的标号
+						while (character != "\n") {
+							character = heap[++flag];
+						}
+						character = heap[++flag];
+						//在每条线段结束标志前,每循环一次读取一行数据
+						while (character != "E") {
+							//读取","前的数字,即X
+							while (character != ",") {
+								numcharacter += character;
+								character = heap[++flag];
+							}
+							character = heap[++flag];
+							number[i++] = parseFloat(numcharacter); //将字符转化为浮点数并存进数组
+							numcharacter = ""; //置空,以便重新读入字符
+							//读取"\n"前的数字,即Y
+							while (character != "\n") {
+								numcharacter += character;
+								character = heap[++flag];
+							}
+							character = heap[++flag];
+							number[i++] = parseFloat(numcharacter); //将字符转化为浮点数并存进数组
+							numcharacter = ""; //置空,以便重新读入字符
+						}
+						number[i++] = -1; //读至每条线段的结束标记"END"时,存入-1表示一条线段结束
+						flag += 5; //跳至下一行起始
+						character = heap[flag];
+					}
+				}
+				//返回读取到的线段
+				return number;
+			}
+
+			//在指定画布上绘制指定的线段
+			function draw(number, myCanvas) {
+				var canvas = myCanvas; //获取画布元素
+				var cxt = canvas.getContext('2d'); //getContext("2d") 对象是内建的 HTML5 对象，拥有多种绘制路径、矩形、圆形、字符以及添加图像的方法
+				cxt.beginPath(); //开始绘制新的图案,避免重新绘制上次已绘制的图案
+				cxt.lineWidth = 3; //设置线宽
+				var n = number.length; //数组长度
+				var x = new Array(); //存放某条线段中的X坐标
+				var y = new Array(); //存放某条线段中的Y坐标
+				var j = 0;
+				for (var i = 0; i < n; i++) {
+					//在一条线段结束前,将XY分别存入独立的数组,j标记数组长度
+					if (number[i] != -1) {
+						x[j] = number[i] * 20;
+						y[j] = (320 - (number[++i] * 20));
+						j++;
+					} else {
+						cxt.moveTo(x[0], y[0]);
+						for (var k = 1; k < j; k++) {
+							cxt.lineTo(x[k], y[k]); //线条结束坐标					
+						}
+						cxt.stroke();
+						j = 0; //相当于置空XY数组以便于重新读入
+					}
+				}
+			}
+		</script>
+	</body>
+</html>
