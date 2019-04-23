@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>世界地图投影</title>
+		<style type="text/css">
+			.buttons {
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 12%;
+				width: 70px;
+				margin-left: 70px;
+			}
+			
+			.buttons:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+
+			.numbers {
+				width: 70px;
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; width: 900px; background-color: cyan; text-align: center;font-family: '楷体';">绘制世界地图</h1>
+		<p><small style="float: right; margin-right: 20px; font-style: italic;">By 10170313</small></p>
+		<br>
+		<div style="width: 90%;margin-left: 5%;">
+			<input type="file" id="fileRead" onchange="getPoints()" style="visibility: hidden; position: absolute;">
+			<button type="button" class="buttons" onclick="fileRead.click()">加载</button>
+			<button name="bt" disabled="disabled" type="button" class="buttons" onclick="drawLines()">经纬网</button>
+			<button name="bt" disabled="disabled" type="button" class="buttons" value="mokatuo" onclick="setValue(this.value)">墨卡托</button>
+			<p style="display: inline;">大圆航线起止点: A</p>
+			<input name="bt" disabled="disabled" type="number" id="ax" class="numbers" value="116.4" step="0.001" min="-180" max="180">
+			<p style="display: inline;">-</p>
+			<input name="bt" disabled="disabled" type="number" id="ay" class="numbers" value="39.8" step="0.001" min="-90" max="90">
+			<p style="display: inline;margin-left: 50px;">B</p>
+			<input name="bt" disabled="disabled" type="number" id="bx" class="numbers" value="2.2" step="0.001" min="-180" max="180">
+			<p style="display: inline;">-</p>
+			<input name="bt" disabled="disabled" type="number" id="by" class="numbers" value="48.52" step="0.001" min="-90" max="90">
+			<button name="bt" disabled="disabled" type="button" class="buttons" onclick="cirLine()">大圆航线</button>
+			<button name="bt" disabled="disabled" type="button" class="buttons" onclick="clearCir()">清除</button>
+		</div>
+		<div style="width: 1092px; margin: 20px auto;">
+			<canvas id="map1" width="1090" height="600" style="background-color: white; border: 1px double black; position: absolute;"></canvas>
+			<canvas id="map2" width="1090" height="600" style="border: 1px double black; position: absolute;"></canvas>
+			<canvas id="map3" width="1090" height="600" style="border: 1px double black; position: absolute;"></canvas>
+		</div>
+
+		<script type="text/javascript">
+			//存放全局变量和一些全局设置
+			var points = new Array();//地图点
+			var lines = new Array();//经纬网点
+			var X=new Array();//大圆航线上点的纬度
+			var Y=new Array();//大圆航线上点的经度
+			var canva1 = document.getElementById("map1");//地图图层
+			var canva2 = document.getElementById("map2");//经纬网图层
+			var canva3 = document.getElementById("map3");//大圆航线图层
+			var isDraw = false;//地图图层是否绘制标识
+			var isDrawLines = false;//经纬网图层是否绘制标识
+			var isDrawCir = false;//大圆航线图层是否绘制标识
+			var change = "normal";//投影变换标识
+			//将所有画布的坐标系平移
+			var cxt1 = canva1.getContext('2d');
+			cxt1.lineWidth = 0.5;
+			cxt1.translate(545, -300);
+			var cxt2 = canva2.getContext('2d');
+			cxt2.translate(545, -300);
+			cxt2.lineWidth=0.3;
+			var cxt3 = canva3.getContext('2d');
+			cxt3.translate(545, -300);
+			cxt3.strokeStyle="blue";
+			//经纬度数组设置
+			var k = 0;
+			for (var j = -85; j < 90; j += 5) {
+				for (var i = -180; i < 185; i += 5, k++) {
+					lines[k] = i;
+					lines[++k] = j;
+				}
+				lines[k] = NaN;
+				k++;
+			}
+			for (var i = -175; i < 180; i += 5) {
+				for (var j = -90; j < 95; j += 5, k++) {
+					lines[k] = i;
+					lines[++k] = j;
+				}
+				lines[k] = NaN;
+				k++;
+			}
+		</script>
+		<script type="text/javascript">
+			//递归计算大圆航线上的点
+			function midPoints (x1,y1,x2,y2) {
+				//中点计算
+				var lat1 = y1 * Math.PI / 180;
+				var lat2 = y2 * Math.PI / 180;
+				var long1 = x1 * Math.PI / 180;
+				var long2 = x2 * Math.PI / 180;
+				
+				var Bx = Math.cos(lat2) * Math.cos(long2 - long1);
+				var By = Math.cos(lat2) * Math.sin(long2 - long1);
+				var latm = Math.atan2(Math.sin(lat1) + Math.sin(lat2), Math.sqrt((Math.cos(lat1) + Bx) * (Math.cos(lat1) + Bx) + By * By));
+				var lonm = long1 + Math.atan2(By, Math.cos(lat1) + Bx);
+				
+				var xMid=lonm*180/Math.PI;
+				var yMid=latm*180/Math.PI;
+				//判断是否达到比较近的距离,没有达到则递归计算
+				if((Math.abs(xMid-x1))<5&&(Math.abs(yMid-y1)<5)){
+					X.push(xMid);
+					Y.push(yMid);
+					return 0;
+				}
+				else{
+					midPoints(x1,y1,xMid,yMid);
+					X.push(xMid);
+					Y.push(yMid);
+					midPoints(xMid,yMid,x2,y2);
+				}
+				return 0;
+			}
+			
+			//绘制大圆航线
+			function cirLine(){
+				//先判断是否清空画布
+				if(isDrawCir){
+					cxt3.clearRect(-545,300,canva3.width,canva3.height);
+				}
+				//计算大圆航线上的点
+				var x1=document.getElementById("ax").value;
+				var y1=document.getElementById("ay").value;
+				var x2=document.getElementById("bx").value;
+				var y2=document.getElementById("by").value;
+				midPoints(x1,y1,x2,y2);
+				//插入头尾两个点
+				X.unshift(x1);
+				Y.unshift(y1);
+				X.push(x2);
+				Y.push(y2);
+				
+				var num=X.length;
+				//无投影变换情况的绘制
+				if(change=="normal"){
+					cxt3.moveTo(X[0]*3,canva3.height- Y[0]*3);
+					for(var i=1;i<num;i++){
+						cxt3.lineTo(X[i]*3,canva3.height-Y[i]*3);
+					}
+					cxt3.stroke();
+					cxt3.beginPath();
+				}
+				//墨卡托投影下绘制
+				if(change=="mokatuo"){
+					var a = 6378137;
+					var b = 6356752.3142;
+					var ab = (a / b) * (a / b);
+					var e = 1 / 298.257224;
+					var e2 = e / 2;
+					var e1 = Math.sqrt(ab - 1);
+					var N0 = (a * a / b) / Math.sqrt(1 + e1 * e1);
+					
+					var B = Y[0] / 180 * Math.PI;
+					var L = X[0] / 180 * Math.PI;
+					X[0] = N0 * L;
+					Y[0] = N0 * Math.log(Math.tan((Math.PI + 2 * B) / 4) * Math.pow((1 - e * Math.sin(B)) / (1 + e * Math.sin(
+						B)), e2));
+					cxt3.moveTo(X[0]* 0.000016,canva3.height - (Y[0] * 0.000016));
+					for(var i=1;i<num;i++){
+						var B = Y[i] / 180 * Math.PI;
+						var L = X[i] / 180 * Math.PI;
+						X[i] = N0 * L;
+						Y[i] = N0 * Math.log(Math.tan((Math.PI + 2 * B) / 4) * Math.pow((1 - e * Math.sin(B)) / (1 + e * Math.sin(
+							B)), e2));
+						cxt3.lineTo(X[i]* 0.000016,canva3.height - (Y[i] * 0.000016));
+					}
+					cxt3.stroke();
+					cxt3.beginPath();
+				}
+				isDrawCir=true;
+				X.splice(0,X.length);
+				Y.splice(0,Y.length);
+			}
+			
+			//读取点并绘制未变换的地图
+			function getPoints() {
+				var file = document.getElementById("fileRead").files[0];
+				var reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str = reader.result;
+					var numcharacter = "";
+					var i = 0;
+					var flag = 0;
+					var character = str[flag];
+					var start = true;
+					while (character != null) {
+						if (character == "E") {
+							flag += 5;
+							character = str[flag];
+						} else {
+							while (character != "\n") {
+								character = str[++flag];
+							}
+							character = str[++flag];
+							while (character != "E") {
+								while (character != ",") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								points[i++] = parseFloat(numcharacter);
+								numcharacter = "";
+								while (character != "\n") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								points[i++] = parseFloat(numcharacter);
+								numcharacter = "";
+
+								if (start == true) {
+									cxt1.moveTo(points[i - 2] * 3, canva1.height - points[i - 1] * 3);
+									start = false;
+								} else {
+									cxt1.lineTo(points[i - 2] * 3, canva1.height - points[i - 1] * 3);
+								}
+							}
+							points[i++] = NaN;
+							flag += 5;
+							character = str[flag];
+							cxt1.stroke();
+							cxt1.beginPath();
+							start = true;
+						}
+					}
+				}
+				isDraw = true;
+				//解除一些按钮的禁用状态
+				var obj=document.getElementsByName("bt");
+				for(var i=0;i<obj.length;i++){
+					obj[i].disabled=false;
+				}
+			}
+
+			//绘制地图
+			function draw() {
+				var temp = points.slice(); //深拷贝第一层数据
+				//判断是否清除画布
+				if (isDraw == true) {
+					cxt1.clearRect(-545, 300, canva1.width, canva1.height);
+				}
+				var N = temp.length;
+				//墨卡托投影的绘制
+				if (change == "mokatuo") {
+					var start = true;
+					var a = 6378137;
+					var b = 6356752.3142;
+					var e = 1 / 298.257224;
+					var e1 = Math.sqrt(Math.pow(a / b, 2) - 1);
+					var N0 = (Math.pow(a, 2) / b) / Math.sqrt(1 + Math.pow(e1, 2));
+					var K = N0;
+
+					for (var i = 0; i < N; i += 2) {
+						if (!isNaN(temp[i])) {
+							var B = temp[i + 1] / 180 * Math.PI;
+							var L = temp[i] / 180 * Math.PI;
+							temp[i] = K * L;
+							temp[i + 1] = K * Math.log(Math.tan((Math.PI + 2 * B) / 4) * Math.pow((1 - e * Math.sin(B)) / (1 + e * Math.sin(
+								B)), (e / 2)));
+
+							if (start == true) {
+								cxt1.moveTo(temp[i] * 0.000016, canva1.height - (temp[i + 1] * 0.000016));
+								start = false;
+							} else {
+								cxt1.lineTo(temp[i] * 0.000016, canva1.height - (temp[i + 1] * 0.000016));
+							}
+						} else {
+							cxt1.stroke();
+							cxt1.beginPath();
+							start = true;
+							i--;
+						}
+					}
+				}
+				isDraw = true;
+			}
+
+			//绘制经纬网
+			function drawLines() {
+				var temp = lines.slice(); //深拷贝第一层数据
+				if (isDrawLines == true) {
+					cxt2.clearRect(-545, 300, canva2.width, canva2.height);
+					isDrawLines = false;
+					return -1;
+				}
+				var N = temp.length;
+				if (change == "mokatuo") {
+					var start = true;
+					var a = 6378137;
+					var b = 6356752.3142;
+					var ab = (a / b) * (a / b);
+					var e = 1 / 298.257224;
+					var e2 = e / 2;
+					var e1 = Math.sqrt(ab - 1);
+					var N0 = (a * a / b) / Math.sqrt(1 + e1 * e1);
+
+					for (var i = 0; i < N; i += 2) {
+						if (!isNaN(temp[i])) {
+							var B = temp[i + 1] / 180 * Math.PI;
+							var L = temp[i] / 180 * Math.PI;
+							temp[i] = N0 * L;
+							temp[i + 1] = N0 * Math.log(Math.tan((Math.PI + 2 * B) / 4) * Math.pow((1 - e * Math.sin(B)) / (1 + e * Math.sin(
+								B)), e2));
+
+							if (start == true) {
+								cxt2.moveTo(temp[i] * 0.000016, canva2.height - (temp[i + 1] * 0.000016));
+								start = false;
+							} else {
+								cxt2.lineTo(temp[i] * 0.000016, canva2.height - (temp[i + 1] * 0.000016));
+							}
+						} else {
+							cxt2.stroke();
+							cxt2.beginPath();
+							start = true;
+							i--;
+						}
+					}
+				}
+				if (change == "normal") {
+					var start = true;
+					for (var i = 0; i < N; i += 2) {
+						if (!isNaN(temp[i])) {
+							var x = temp[i] * 3;
+							var y = canva2.height - (temp[i + 1] * 3);
+							if (start == true) {
+								cxt2.moveTo(x, y);
+								start = false;
+							} else {
+								cxt2.lineTo(x, y);
+							}
+						} else {
+							cxt2.stroke();
+							cxt2.beginPath();
+							start = true;
+							i--;
+						}
+					}
+				}
+				isDrawLines = true;
+			}
+
+			//设置变换形式并调用绘制函数
+			function setValue(value) {
+				change = value;
+				draw();
+				if (isDrawLines) {
+					drawLines();
+					drawLines();
+				}
+			}
+			
+			//清除大圆航线
+			function clearCir (){
+				cxt3.clearRect(-545,300,canva3.width,canva3.height);
+			}
+		</script>
+	</body>
+</html>
