@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>四叉树编码</title>
+		<style type="text/css">
+			.buts{
+				width: 50px;
+				margin-left:300px;
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 12%;
+			}
+			.buts:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; text-align: center; width: 900px; background-color: cyan; font-family: '楷体';">四叉树编码</h1>
+		<p style="margin-right: 100px; float: right; display: block;"><small style="font-style: italic;">By 10170313</small></p>
+		<div style="width: 1000px; margin: 0 auto;">
+			<input type="file" style="visibility: hidden; position: absolute;" id="fileRead" onchange="getNumber()">
+			<button type="button" class="buts" onclick="fileRead.click()">加载</button>
+			<button type="button" class="buts" id="start" disabled="disabled" onclick="setCodes()">编码</button>
+			<br>
+			<p>传入的数据如下：</p>
+			<p id="p1"></p>
+			<p id="p2"></p>
+		</div>
+		
+		<script type="text/javascript">
+			//全局变量
+			var numbers= new Array();//二维数组存储栅格
+			//code对象,包括morton码,深度,像素值和是否被归并的标识
+			function code (morton,layer,value,del){
+				this.morton=morton;
+				this.layer=layer;
+				this.value=value;
+				this.del=del;
+			}
+			var codes=new Array();//code数组
+		</script>
+		<script type="text/javascript">
+			//获取像素值并存入二维数组
+			function getNumber(){
+				//清除上一次的全局变量
+				numbers.splice(0,numbers.length);
+				codes.splice(0,codes.length);
+				//清除上一次的结果
+				var obj=document.getElementById('p2');
+				obj.innerHTML="";
+				var file =document.getElementById('fileRead').files[0];
+				var reader=new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str=reader.result;
+					var size=0;
+					var sizeTemp="";
+					var flag=0;
+					var i=0;
+					var character=str[flag];
+					var num="";
+					var line = new Array();
+					//读取传入栅格的行和列,只保存了行
+					while(character!='\n'){
+						num+=character;
+						character=str[++flag];
+					}
+					for(var j=0;j<num.length;j++){
+						if(num[j]!=','){
+							sizeTemp+=num[j];
+						}else{
+							j=num.length;
+						}
+					}
+					size=parseInt(sizeTemp);//行保存为大小
+					character=str[++flag];
+					num="";
+					var numOfPix=0;//记录读入像素的数目
+					while(character!=null){
+						//读取逗号或回车前的数字
+						while(character!=','&&character!='\n'){
+							num+=character;
+							character=str[++flag];
+						}
+						line.push(parseInt(num));
+						numOfPix++;
+						num="";
+						//若读满一行则存入一维数组并放入另一个数组构成二维数组
+						if(numOfPix==size){
+							numbers.push(JSON.parse(JSON.stringify(line)));
+							line.splice(0,line.length);
+							flag+=2;
+							numOfPix=0;
+						}
+						character=str[++flag];
+					}
+					showNumber();//展示读入的数据
+					getCodes();//转存为code结构
+					//解除按钮的不可用状态
+					var but=document.getElementById('start');
+					but.disabled=false;
+				}
+			}
+			//展示读入的数据
+			function showNumber(){
+				var N=numbers.length;
+				var str="";
+				for(var i=0;i<N;i++){
+					for(var j=0;j<N;j++){
+						str+=numbers[i][j];
+						str+=" ";
+					}
+					str+="<br>";
+				}
+				var target=document.getElementById('p1');
+				target.innerHTML=str;
+			}
+			//十进制转二进制
+			function decimalToBinary (dec){
+				var s=dec+"";
+				var bin=parseInt(s,10).toString(2);
+				return parseInt(bin);
+			}
+			//得到code形式的数据
+			function getCodes(){
+				 var N=numbers.length;
+				 var lay=Math.log2(N);//初始深度为最大深度
+				 var cod=new code(0,0,0,false);
+				 for(var i=0;i<N;i++){
+					 for(var j=0;j<N;j++){
+						 var mor=2*decimalToBinary(i)+decimalToBinary(j);//得到morton码
+						  var cod=new code(mor,lay,numbers[i][j],false);//是否被归并的标识初始为否
+						  codes.push(JSON.parse(JSON.stringify(cod)));
+					 }
+				 }
+				 //按morton码排序
+				 codes.sort(function(a,b){
+					 return a.morton-b.morton;
+				 });
+			}
+			//进行归并
+			function setCodes(){
+				var lay=codes[0].layer;//当前归并层次所在的深度
+				var N=codes.length;
+				while(lay!=1){
+					var i=0;
+					while(i<N){
+						//找到深度与当前归并层次一致的数据
+						if(codes[i].layer=lay){
+							//按morton码搜索之后的三个数据
+							var j=nextMor(i,codes[i].morton+1);
+							var k=nextMor(i,codes[i].morton+2);
+							var l=nextMor(i,codes[i].morton+3);
+							if(j==-1||k==-1||l==-1){
+								//若其中有一个不存在,结束这一层的归并
+								i=N;
+							}else{
+								//都存在的情况下
+								if(codes[i].value==codes[j].value&&
+								codes[i].value==codes[k].value&&
+								codes[i].value==codes[l].value){
+									//若四个值相等,进行归并
+									codes[i].morton=loseBit(lay,codes[i].morton);//减去第一个数据的morton码的最后一位
+									codes[i].layer=lay-1;//深度减一
+									//剩下三个的morton码与第一个一致,深度减一,标识为已被归并
+									codes[j].morton=codes[i].morton;
+									codes[j].layer=lay-1;
+									codes[j].del=true;
+									codes[k].morton=codes[i].morton;
+									codes[k].layer=lay-1;
+									codes[k].del=true;
+									codes[l].morton=codes[i].morton;
+									codes[l].layer=lay-1;
+									codes[l].del=true;
+									i=l;//跳过这三个数据
+								}else{
+									//若不相等则跳到这三个之后
+									i=l;
+								}
+							}
+						}
+						i++;
+					}
+					lay--;//完成一层的归并,当前进行归并的层次减一
+				}
+				showCodes();//归并完成,显示归并后的结果
+			}
+			//按morton码搜索数据,有则返回下标,没有则返回-1
+			function nextMor(i,mor){
+				var N=codes.length;
+				var j=i+1;
+				while(j<N){
+					if(codes[j].morton==mor){
+						return j;
+					}
+					j++;
+				}
+				return -1;
+			}
+			//减去morton码的最后一位
+			function loseBit(num,val){
+				var str=val.toString();
+				var n=str.length;
+				while(n<num){
+					str="0"+str;
+					n++;
+				}
+				str=str.substring(0,str.length-1);
+				var res=parseInt(str);
+				return res;
+			}
+			//显示归并后的数据
+			function showCodes(){
+				var N=codes.length;
+				var str="四进制四叉树编码如下：(依次为四进制Morton码、深度和像素值)<br>";
+				str=str+codes[0].morton+" "+codes[0].layer+" "+codes[0].value+"<br>";
+				var mor=codes[0].morton;
+				for(var i=1;i<N;i++){
+					if(codes[i].del==false){
+						str=str+codes[i].morton+" "+codes[i].layer+" "+codes[i].value+"<br>";
+					}
+				}
+				var tar=document.getElementById('p2');
+				tar.innerHTML=str;
+			}
+		</script>
+	</body>
+</html>
