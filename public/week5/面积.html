@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>计算面积</title>
+
+		<style type="text/css">
+			.buttons {
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 12%;
+				font-size: 14px;
+				width: 90px;
+				margin-left: 30px;
+				margin-right: 30px;
+			}
+
+			.buttons:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+
+			.disabled {
+				opacity: 0.3;
+				cursor: not-allowed;
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; width: 802px; text-align: center; background-color: cyan; font-family: '楷体';">墨卡托投影反算以及面积计算</h1>
+		<p><small style="float: right; margin-right: 20px; font-style: italic;">By 10170313</small></p>
+		<div style="width: 700px; margin: 0 auto;">
+			<input type="file" id="fileRead" onchange="getPoints()" style="visibility: hidden; position: absolute;">
+			<button type="button" class="buttons" onclick="fileRead.click()">加载</button>
+			<button disabled="disabled" type="button" class="buttons disabled" value="mercator" onclick="setValue(this.value)">墨卡托正算</button>
+			<button disabled="disabled" type="button" class="buttons disabled" value="normal" onclick="setValue(this.value)">墨卡托反算</button>
+			<button disabled="disabled" type="button" class="buttons disabled" onclick="drawArea()">计算面积</button>
+		</div>
+		<div style="width: 802px; margin: 10px auto;">
+			<canvas id="map1" width="800" height="600" style="background-color: white; border: 1px double black; position: absolute;"></canvas>
+			<canvas id="map2" width="800" height="600" style="border: 1px double black; position: absolute;"></canvas>
+		</div>
+
+		<script type="text/javascript">
+			//全局变量
+			var PolygonsMercator = new Array(); //存放墨卡托投影下的多边形
+			var PolygonsNormal = new Array();//存放经纬度表示的多边形
+			//center对象,存储每个多边形的重心
+			function Center(x, y) {
+				this.x = x;
+				this.y = y;
+			}
+			//polygon对象,每个对象对应一个多边形,成员有编号,重心,坐标数组和面积
+			function Polygon(number, center, points, area) {
+				this.number = number;
+				this.center = center;
+				this.points = points;
+				this.area = area;
+			}
+			//两个画布分别用来绘制地图和面积
+			var canva1 = document.getElementById("map1");
+			var canva2 = document.getElementById("map2");
+			var isDrawMap = false;//地图是否已绘制标识
+			var isDrawArea = false;//面积是否已显示标识
+			//平移两个画布的坐标系
+			var cxt1 = canva1.getContext('2d');
+			cxt1.translate(-12900, 3570);
+			var cxt2 = canva2.getContext('2d');
+			cxt2.translate(-12900, 3570);
+			var change = "mercator";
+
+			//获取面数据
+			function getPoints() {
+				var file = document.getElementById("fileRead").files[0];
+				var reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str = reader.result;
+					var numcharacter = "";
+					var i = 0;
+					var flag = 0;
+					var number = 0;
+					var character = str[flag];
+					var pointsTemp = new Array();
+					var center = new Center(0, 0);
+					//读取坐标点和每段线段开始前的标识
+					while (character != null) {
+						if (character == "E") {
+							flag += 5;
+							character = str[flag];
+						} else {
+							//读取线段编号
+							while (character != "\n") {
+								numcharacter += character;
+								character = str[++flag];
+							}
+							number = parseInt(numcharacter);
+							numcharacter = "";
+							character = str[++flag];
+							//读取线段上点的坐标
+							while (character != "E") {
+								while (character != ",") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointsTemp[i++] = parseFloat(numcharacter);
+								numcharacter = "";
+								while (character != "\n") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointsTemp[i++] = parseFloat(numcharacter);
+								numcharacter = "";
+							}
+						}
+						var points = pointsTemp.slice();
+						var polygon = new Polygon(number, center, points, 0);//初始化一个面对象
+						PolygonsMercator.push(polygon);//将面对象存入数组,此时对象中有效的信息只有编号和坐标
+						pointsTemp.splice(0, pointsTemp.length);
+						i = 0;
+						flag += 5;
+						character = str[flag];
+					}
+					PolygonsMercator.pop();//剔除最后一个END导致的空数据
+					drawMap();//绘制地图
+				}
+				//取消一些按钮的禁用状态
+				var obj=document.getElementsByClassName("buttons disabled");
+				while(obj.length!=0){
+					obj[0].disabled = false;
+					obj[0].setAttribute("class", "buttons");
+				}
+			}
+			
+			//绘制地图
+			function drawMap() {
+				//清除画布
+				if (isDrawMap == true) {
+					cxt1.clearRect(12900, -3570, canva1.width, canva1.height);
+				}
+				var N = PolygonsMercator.length;
+				cxt1.beginPath();
+				//绘制墨卡托投影下的地图
+				if (change == "mercator") {
+					for (var i = 0; i < N; i++) {
+						var n = PolygonsMercator[i].points.length;
+						var x = PolygonsMercator[i].points[0];
+						var y = PolygonsMercator[i].points[1];
+						cxt1.moveTo(x * 0.001, canva1.height - y * 0.001);
+						for (var j = 2; j < n; j += 2) {
+							x = PolygonsMercator[i].points[j];
+							y = PolygonsMercator[i].points[j + 1];
+							cxt1.lineTo(x * 0.001, canva1.height - y * 0.001);
+						}
+						cxt1.stroke();
+						cxt1.beginPath();
+					}
+				}
+				//绘制经纬度下的地图
+				if (change == "normal") {
+					if (PolygonsNormal.length == 0) {
+						for (var i = 0; i < N; i++) {
+							var pol = setNormalPolygon(PolygonsMercator[i]);//墨卡托反算
+							PolygonsNormal.push(pol);
+						}
+					}
+						for (var i = 0; i < N; i++) {
+							var n = PolygonsNormal[i].points.length;
+							var x = PolygonsNormal[i].points[0];
+							var y = PolygonsNormal[i].points[1];
+							cxt1.moveTo(x * 110 + 210, canva1.height - y * 110 - 270);
+							for (var j = 2; j < n; j += 2) {
+								x = PolygonsNormal[i].points[j];
+								y = PolygonsNormal[i].points[j + 1];
+								cxt1.lineTo(x * 110 + 210, canva1.height - y * 110 - 270);
+							}
+							cxt1.stroke();
+							cxt1.beginPath();
+						}
+				}
+				isDrawMap = true;
+			}
+
+			//面积计算并显示
+			function drawArea() {
+				//清除画布
+				if (isDrawArea == true) {
+					cxt2.clearRect(12900, -3570, canva2.width, canva2.height);
+					isDrawArea = false;
+					return 0;
+				}
+				var N = PolygonsMercator.length;
+				var cen = new Center(0, 0);
+				var pol = new Polygon(0, cen, 0, 0);
+				//在墨卡托投影下的面积
+				if (change == "mercator") {
+					PolygonsMercator.push(pol); //解决原本最后一个元素后的number为空的问题(for循环中的if语句)
+					if (PolygonsMercator[0].area == 0) {
+						for (var i = 0; i < N; i++) {
+							mercatorAreaAndCenter(PolygonsMercator[i]);//计算墨卡托投影下的面积和重心
+						}
+					}
+					var space = 0;
+					for (var i = 0; i < N; i++, space++) {
+						//判断是否出现编号相等的情况.若没有则显示面积,否则进入else处理
+						if (PolygonsMercator[i].number != PolygonsMercator[i + 1].number) {
+							var xc = PolygonsMercator[i].center.x;
+							var yc = PolygonsMercator[i].center.y;
+							var areaString = PolygonsMercator[i].area.toString();//转为字符
+							var str = "城市" + PolygonsMercator[i].number.toString() + ":" + areaString;
+							cxt2.beginPath();
+							cxt2.arc(xc * 0.001, canva2.height - yc * 0.001, 3, 0, 2 * Math.PI);//在重心左侧绘制一个小圆用以标识
+							cxt2.stroke();
+							cxt2.fillText(areaString, xc * 0.001 + 5, canva2.height - yc * 0.001);//在重心处显示面积
+							cxt2.fillText(str, 13550, -3550 + space * 12);//在画布右上角显示面积
+						} else {
+							var num = PolygonsMercator[i].number;//暂存编号
+							var j = i;
+							var subscript = 0;
+							var areaTemp = 0;
+							//在相同编号的面中,找到面积最大的一个
+							while (PolygonsMercator[j].number == num) {
+								if (PolygonsMercator[j].area > areaTemp) {
+									areaTemp = PolygonsMercator[j].area;
+									subscript = j;
+								}
+								j++;
+							}
+							var trueArea = PolygonsMercator[subscript].area;
+							//将各个面的面积相加
+							for (var k = i; k < j; k++) {
+								if (k != subscript) {
+									trueArea += PolygonsMercator[k].area;
+								}
+							}
+							//取面积最大的一个面的重心
+							var xc = PolygonsMercator[subscript].center.x;
+							var yc = PolygonsMercator[subscript].center.y;
+							var areaString = trueArea.toString();
+							var str = "城市" + PolygonsMercator[subscript].number.toString() + ":" + areaString;
+							cxt2.beginPath();
+							cxt2.arc(xc * 0.001, canva2.height - yc * 0.001, 3, 0, 2 * Math.PI);//在重心左侧绘制一个小圆用以标识
+							cxt2.stroke();
+							cxt2.fillText(areaString, xc * 0.001 + 5, canva2.height - yc * 0.001);//在重心处显示面积
+							cxt2.fillText(str, 13550, -3550 + space * 12);//在画布右上角显示面积
+							i = j - 1;
+						}
+					}
+					PolygonsMercator.pop();//将之前加入的最后一个面去除
+				}
+				//在经纬度下的面积,出计算面积不同外其余同上
+				if (change == "normal") {
+					PolygonsNormal.push(pol);
+					if (PolygonsNormal[0].area == 0) {
+						for (var i = 0; i < N; i++) {
+							normalAreaAndCenter(PolygonsNormal[i]);//计算经纬度下的面积和重心
+						}
+					}
+					var space = 0;
+					for (var i = 0; i < N; i++, space++) {
+						if (PolygonsNormal[i].number != PolygonsNormal[i + 1].number) {
+							var xc = PolygonsNormal[i].center.x;
+							var yc = PolygonsNormal[i].center.y;
+							var areaString = PolygonsNormal[i].area.toString();
+							var str = "城市" + PolygonsNormal[i].number.toString() + ":" + areaString;
+							cxt2.beginPath();
+							cxt2.arc(xc * 110 + 210, canva2.height - yc * 110 - 270, 3, 0, 2 * Math.PI);
+							cxt2.stroke();
+							cxt2.fillText(areaString, xc * 110 + 215, canva2.height - yc * 110 - 270);
+							cxt2.fillText(str, 13550, -3550 + space * 12);
+						} else {
+							var num = PolygonsNormal[i].number;
+							var j = i;
+							var subscript = 0;
+							var areaTemp = 0;
+							while (PolygonsNormal[j].number == num) {
+								if (PolygonsNormal[j].area > areaTemp) {
+									areaTemp = PolygonsNormal[j].area;
+									subscript = j;
+								}
+								j++;
+							}
+							var trueArea = PolygonsNormal[subscript].area;
+							for (var k = i; k < j; k++) {
+								if (k != subscript) {
+									trueArea += PolygonsNormal[k].area;
+								}
+							}
+							var xc = PolygonsNormal[subscript].center.x;
+							var yc = PolygonsNormal[subscript].center.y;
+							var areaString = trueArea.toString();
+							var str = "城市" + PolygonsNormal[subscript].number.toString() + ":" + areaString;
+							cxt2.beginPath();
+							cxt2.arc(xc * 110 + 210, canva2.height - yc * 110 - 270, 3, 0, 2 * Math.PI);
+							cxt2.stroke();
+							cxt2.fillText(areaString, xc * 110 + 215, canva2.height - yc * 110 - 270);
+							cxt2.fillText(str, 13550, -3550 + space * 12);
+							i = j - 1;
+						}
+					}
+					PolygonsNormal.pop();
+				}
+				isDrawArea = true;
+			}
+
+			//计算平面面积和重心(墨卡托)
+			function mercatorAreaAndCenter(Polygon) {
+				var N = Polygon.points.length - 3;
+				var A = 0;
+				var xc = 0,
+					yc = 0;
+				for (var i = 0; i < N; i += 2) {
+					var temp = (Polygon.points[i] * Polygon.points[i + 3] - Polygon.points[i + 2] * Polygon.points[i + 1]) / 2;
+					A += temp;
+					xc += temp * (Polygon.points[i] + Polygon.points[i + 2]) / 3;
+					yc += temp * (Polygon.points[i + 1] + Polygon.points[i + 3]) / 3;
+				}
+				xc = xc / A;
+				yc = yc / A;
+				var centerTemp = new Center(xc, yc);
+				Polygon.area = Math.abs(A);
+				Polygon.center = centerTemp;
+			}
+
+			function normalAreaAndCenter(Polygon) {
+				//按照平面的方式处理重心,此处的面积不被存储
+				var N = Polygon.points.length - 3;
+				var A = 0;
+				var xc = 0,
+					yc = 0;
+				for (var i = 0; i < N; i += 2) {
+					var temp = (Polygon.points[i] * Polygon.points[i + 3] - Polygon.points[i + 2] * Polygon.points[i + 1]) / 2;
+					A += temp;
+					xc += temp * (Polygon.points[i] + Polygon.points[i + 2]) / 3;
+					yc += temp * (Polygon.points[i + 1] + Polygon.points[i + 3]) / 3;
+				}
+				xc = xc / A;
+				yc = yc / A;
+				var centerTemp = new Center(xc, yc);
+				Polygon.center = centerTemp;
+
+				//计算面积
+				A = 0;
+				//椭球参数
+				var a = 6378137;
+				var b = 6356752.3142;
+				var e1 = Math.sqrt(Math.pow(a / b, 2) - 1);
+
+				var B0 = 30 / 180 * Math.PI; //江苏省最低纬度
+				var AA = 1 + 1 / 2 * (e1 * e1) + 3 / 8 * (Math.pow(e1, 4)) + 5 / 16 * (Math.pow(e1, 6));
+				var BB = 1 / 6 * (e1 * e1) + 3 / 16 * (Math.pow(e1, 4)) + 3 / 16 * (Math.pow(e1, 6));
+				var CC = 3 / 80 * (Math.pow(e1, 4)) + 1 / 16 * (Math.pow(e1, 6));
+				var DD = 1 / 112 * (Math.pow(e1, 6));
+				for (var i = 0; i < N; i += 2) {
+					var B1 = Polygon.points[i + 1] / 180 * Math.PI;
+					var B2 = Polygon.points[i + 3] / 180 * Math.PI;
+					var B3 = (B1 + B2) / 2;
+					var dB = B3 - B0;
+					var aB = (B3 + B0) / 2;
+
+					var L1 = Polygon.points[i] / 180 * Math.PI;
+					var L2 = Polygon.points[i + 2] / 180 * Math.PI;
+					var K = 2 * a * a * (1 - e1 * e1) * (L2 - L1);
+					A += K * (AA * Math.sin(dB / 2) * Math.cos(aB) - BB * Math.sin(3 * dB / 2) * Math.cos(3 * aB) +
+						CC * Math.sin(5 * dB / 2) * Math.cos(5 * aB) - DD * Math.sin(7 * dB / 2) * Math.cos(7 * aB));
+				}
+				Polygon.area = Math.abs(A);
+			}
+			
+			//墨卡托反算
+			function setNormalPolygon(Pol) {
+				//墨卡托投影的参数
+				var a = 6378137;
+				var b = 6356752.3142;
+				var e = 1 / 298.257224;
+				var e1 = Math.sqrt(Math.pow(a / b, 2) - 1);
+				var L0 = 0;
+				var B0 = 0;
+				var N0 = (a * a / b) / Math.sqrt(1 + e1 * e1 * Math.cos(B0) * Math.cos(B0));
+				var K = N0 * Math.cos(B0);
+
+				var num = Pol.number;
+				var pointNormal = new Array();
+				var n = Pol.points.length;
+				for (var i = 0; i < n; i += 2) {
+					var x = Pol.points[i + 1];
+					var y = Pol.points[i];
+					var b0 = 50 / 180 * Math.PI;
+					var temp = b0;
+					var b = Math.PI / 2 - 2 * Math.atan(Math.exp(-x / K) * Math.pow(Math.exp(e / 2), Math.log((1 - e * Math.sin(b0)) /
+						(1 + e * Math.sin(b0)))));
+					while (Math.abs(temp - b) > 0.00001) {
+						temp = b;
+						b = Math.PI / 2 - 2 * Math.atan(Math.exp(-x / K) * Math.pow(Math.exp(e / 2), Math.log((1 - e * Math.sin(temp)) /
+							(1 + e * Math.sin(temp)))));
+					}
+					var l = (y / K + L0) * 180 / Math.PI;
+					b = b * 180 / Math.PI;
+					pointNormal.push(l);
+					pointNormal.push(b);
+				}
+				var cen = Center(0, 0);
+				var area = 0;
+				var pol = new Polygon(num, cen, pointNormal, area);
+				return pol;
+			}
+			
+			//改变变换标识并重绘
+			function setValue(value) {
+				change = value;
+				drawMap();
+				if (isDrawArea) {
+					drawArea();
+					drawArea();
+				}
+			}
+		</script>
+	</body>
+</html>
