@@ -33,8 +33,9 @@
 			}
 		</style>
 	</head>
-	<body>
-		<p style="text-align: center;font-size: 25px; font-family: 楷体;">请上传文件,并在选择变换方式后点击刷新按钮</p>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; text-align: center; width: 900px; background-color: cyan; font-family: '楷体';">请上传文件,并在选择变换方式后点击刷新按钮</h1>
+		<p style="margin-right: 70px; float: right; display: block;"><small style="font-style: italic;">By 10170313</small></p>
 		<div id="div1">
 			<span class="span1"><input type="radio" class="radio" name="change" value="normal" onclick="getValue(this.value)">正常</span>
 			<span class="span1"><input type="radio" class="radio" name="change" value="rotate" onclick="getValue(this.value)">旋转</span>
@@ -58,7 +59,6 @@
 			<!--上传文件，文件改变时运行processFiles函数-->
 			<span class="span2"><button style="float: left;" type="button" onclick="draw(canvas2,charactertemp2)">刷新</button></span>
 		</div>
-		<p style="width: 80%;"><small style="float: right;">By 10170313</small></p>
 		<script type="text/javascript">
 			//放置全局变量
 			var canvas1 = document.getElementById('myCanvas1');

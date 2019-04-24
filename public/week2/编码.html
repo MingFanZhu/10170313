@@ -5,14 +5,15 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width,initial-scale=1.0">
 	</head>
-	<body>
-		<p>请上传文件</p>
-		<canvas id="myCanvas1" width="320" height="320"></canvas>
-		<canvas id="myCanvas2" width="320" height="320"></canvas>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; text-align: center; width: 900px; background-color: cyan; font-family: '楷体';">编码</h1>
+		<p style="margin-right: 100px; float: right; display: block;"><small style="font-style: italic;">By 10170313</small></p>
+		<canvas id="myCanvas1" width="320" height="320" style="margin-left: 310px;"></canvas>
+		<canvas id="myCanvas2" width="320" height="320" style="margin-left: 256px;"></canvas>
 		<br>
-		<input id="fileInput1" type="file" onchange="processFiles(fileInput1,myCanvas1)">
+		<input id="fileInput1" type="file" style="margin-left: 310px;" onchange="processFiles(fileInput1,myCanvas1)">
 		<!--上传文件，文件改变时运行processFiles函数-->
-		<input id="fileInput2" type="file" onchange="processFiles(fileInput2,myCanvas2)">
+		<input id="fileInput2" type="file" style="margin-left: 322px;" onchange="processFiles(fileInput2,myCanvas2)">
 		<!--上传文件，文件改变时运行processFiles函数-->
 		<script>
 			//绘制格网

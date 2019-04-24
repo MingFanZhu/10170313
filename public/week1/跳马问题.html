@@ -58,6 +58,7 @@
 			var jump =[ [2,1],[1,2],[-1,2],[-2,1],[-2,-1],[-1,-2],[1,-2],[2,-1] ];//跳跃的方向
 			var str="";//输出的字符串
 			var tar=document.getElementById('p1');//输出元素
+			var nochange=false;
 		</script>
 		<script type="text/javascript">
 			//马是否在棋盘内
@@ -114,6 +115,9 @@
 			}
 			//计算入口和显示
 			function result(){
+				if(nochange==true){
+					return 0;
+				}
 				var horse=new Point(start.x,start.y);
 				var map= new Array();
 				//创建棋盘状态数组
@@ -126,6 +130,7 @@
 				}
 				Jump(horse,0,0,map);
 				tar.innerHTML=str;//显示
+				nochange=true;
 			}
 			//重置一些全局变量
 			function reset(){
@@ -134,6 +139,7 @@
 				tar.innerHTML=str;
 				roads.splice(0,roads.length);
 				beg = true;
+				nochange=false;
 			}
 			//得到用户输入
 			function setX(value){

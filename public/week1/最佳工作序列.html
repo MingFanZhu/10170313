@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>最佳工作序列</title>
+		<style type="text/css">
+			.buts {
+				width: 50px;
+				margin-left: 260px;
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 12%;
+			}
+
+			.buts:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; text-align: center; width: 900px; background-color: cyan; font-family: '楷体';">最佳工作序列</h1>
+		<p style="margin-right: 100px; float: right; display: block;"><small style="font-style: italic;">By 10170313</small></p>
+		<div style="width: 900px; margin: 0 auto;">
+			<input type="file" id="read" style="visibility: hidden; position: absolute;" onchange="getData()">
+			<button type="button" class="buts" onclick="read.click()">加载</button>
+			<button type="button" class="buts" onclick="getResult()">计算</button>
+			<p id="p1"></p>
+			<p id="p2"></p>
+		</div>
+		<script type="text/javascript">
+			//类Work，包含工作的id，时间，期限和价值
+			function Work(i, t, l, v) {
+				this.ID = i;
+				this.time = t;
+				this.limit = l;
+				this.value = v;
+			}
+			var works = new Array(); //存储工作
+			var result = new Array(); //存储结果(工作的ID)
+			var used = new Array(); //工作是否已被存入结果的标识
+			var time = 0; //总工时
+			var valueRest = 0; //剩余价值
+			var valueRestTemp = 0; //暂存剩余价值
+		</script>
+		<script type="text/javascript">
+			//获取数据并显示
+			function getData() {
+				//清除上一次的全局变量
+				works.slice(0, works.length);
+				result.slice(0, result.length);
+				used.slice(0, used.length);
+				time = 0;
+				valueRest = 0;
+				valueRestTemp = 0;
+				//读取数据
+				var file = document.getElementById('read').files[0];
+				var reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str = reader.result;
+					var flag = 0;
+					var num = "";
+					var character = str[flag];
+					var workTemp = new Work(0, 0, 0, 0);
+					var n = 1; //对应表中的四个字段
+					while (character != null) {
+						while (character != ' ' && character != '\n') {
+							num += character;
+							character = str[++flag];
+						}
+						if (n == 1) {
+							workTemp.ID = parseInt(num);
+							num = "";
+							character = str[++flag];
+						}
+						if (n == 2) {
+							workTemp.time = parseInt(num);
+							num = "";
+							character = str[++flag];
+						}
+						if (n == 3) {
+							workTemp.limit = parseInt(num);
+							num = "";
+							character = str[++flag];
+						}
+						if (n == 4) {
+							n = 0;
+							workTemp.value = parseInt(num);
+							num = "";
+							character = str[++flag];
+							works.push(JSON.parse(JSON.stringify(workTemp)));
+						}
+						n++;
+					}
+					var n = works.length;
+					var obj = document.getElementById('p1');
+					var data = "ID  工时  期限  价值<br>";
+					for (var i = 0; i < n; i++) {
+						used[i] = false;
+						data += works[i].ID + "  " + works[i].time + "  " + works[i].limit + "  " + works[i].value + "<br>";
+					}
+					obj.innerHTML = data; //显示读入的数据
+					//清除上一次的结果显示
+					var obj = document.getElementById('p2');
+					obj.innerHTML = "";
+				}
+			}
+			//获取还未被放入结果的工作数
+			function restWork() {
+				var N = used.length;
+				var j = 0;
+				for (var i = 0; i < N; i++) {
+					if (used[i] == false) {
+						j++
+					}
+				}
+				return j;
+			}
+
+			//递归排序函数
+			function order(value_all, time_all) {
+				var time_temp = 0;
+				var temp = 0;
+				//挑选出可进行的工作中价值最大并且耗时较短的一个
+				for (var it = 0; it < works.length; it++) {
+					var ite = 0
+					//若it不是第一个工作则令ite为现在工作的前一个
+					if (it != 0) {
+						ite = it - 1;
+					}
+					//如果该工作已进入结果序列，则退出本次循环
+					if (used[it] == true)
+						break;
+					valueRestTemp = value_all - works[it].value; //得到暂定的剩余价值
+					time_temp = time_all + works[it].time; //得到暂定的总工时
+					//若不能完成工作则退出本次循环
+					if (time_temp > works[it].limit)
+						break;
+					//若进行此工作后的剩余价值减少，则更新剩余价值，暂存此工作的id，更新总工时
+					if (valueRestTemp < valueRest) {
+						valueRest = valueRestTemp;
+						temp = works[it].ID;
+						time = time_temp;
+					}
+					//若进行工作后的剩余价值与进行上一次工作相同，但上一次所需时间更长则暂存此次的id并更新总工时
+					if (valueRestTemp == valueRest && (works[ite].time > works[it].time)) {
+						temp = works[it].ID;
+						time = time_temp;
+					}
+				}
+				it = 0;
+				//若还可以继续找出符合条件的工作则将此工作id存入结果，并标记此工作已计入结果否则退出递归
+				if (temp != 0) {
+					result.push(temp);
+					used[temp - 1] = true;
+				} else {
+					return 0;
+				}
+				//若只剩一件工作未计入，判断是否将其计入结果，否则进行新的递归
+				var num = restWork();
+				if (num == 1) {
+					for (var i = 0; i < works.length; i++) {
+						//判断是否可以进行最后一项工作
+						if (used[i] == false && time < works[i].limit) {
+							result.push(i + 1);
+							time += works[i].time;
+							valueRest -= works[i].value;
+						}
+					}
+					return 0;
+				} else {
+					order(valueRest, time);
+				}
+			}
+
+			function getResult() {
+				var value_all = 0; //总价值
+				for (var i = 0; i < works.length; i++) {
+					value_all += works[i].value;
+				}
+				valueRest = value_all; //剩余价值
+				order(value_all, 0); //找出工作序列
+				var obj = document.getElementById('p2');
+				var res = "";
+				res += "总工时：" + time + "    总价值：" + (value_all - valueRest) + "<br>工作顺序：<br>";
+				for (var i = 0; i < result.length; i++) {
+					res += result[i] + "  ";
+				}
+				obj.innerHTML = res; //显示结果
+			}
+		</script>
+	</body>
+</html>
