@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>跳马问题</title>
+		<style type="text/css">
+			.button{
+				width: 45px;
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 20%;
+			}
+			.button:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; text-align: center; width: 900px; background-color: cyan; font-family: '楷体';">跳马问题求解</h1>
+		<p style="margin-right: 100px; float: right; display: block;"><small style="font-style: italic;">By 10170313</small></p>
+		<div style="width: 900px; margin: 0 auto;">
+			<p style="text-align: center; font-size: large;">本页面规定的棋盘行列均从1开始</p>
+			<p>请输入棋盘的大小:</p>
+			<p style="display: inline;">棋盘行数：</p>
+			<input style="width: 50px;" type="number" id="X" value="4" onchange="setX(this.value)" min="1">
+			<p style="display: inline;">棋盘列数：</p>
+			<input style="width: 50px;" type="number" id="Y" value="4" onchange="setY(this.value)" min="1">
+			<p>请输入初始位置:</p>
+			<p style="display: inline;">起始点所在行</p>
+			<input style="width: 50px;" type="number" id="startX" value="1" onchange="setStartX(this.value)" min="1">
+			<p style="display: inline;">起始点所在列</p>
+			<input style="width: 50px;" type="number" id="startY" value="1" onchange="setStartY(this.value)" min="1">
+			<button type="button" class="button" onclick="result()">结果</button>
+			<p id="p1"></p>
+		</div>
+
+		<script type="text/javascript">
+			//全局变量
+			//点类
+			function Point(a = 0, b = 0) {
+				this.x = a;
+				this.y = b;
+				this.change = change;
+				//改变点数值的方法
+				function change(c, d) {
+					this.x += c;
+					this.y += d;
+				}
+			}
+			var num = 0; //路径数目
+			var beg = true; //标识是否为起始,避免开始时被认为回到起始点
+			var mapX = 4; //棋盘行
+			var mapY = 4; //棋盘列
+			var start = new Point(0,0); //起点
+			var roads = new Array(); //路径
+			var jump =[ [2,1],[1,2],[-1,2],[-2,1],[-2,-1],[-1,-2],[1,-2],[2,-1] ];//跳跃的方向
+			var str="";//输出的字符串
+			var tar=document.getElementById('p1');//输出元素
+		</script>
+		<script type="text/javascript">
+			//马是否在棋盘内
+			function inMap(horse) {
+				if ((horse.x < mapX && horse.x >= 0) && (horse.y < mapY && horse.y >= 0)) {
+					return true;
+				} else {
+					return false;
+				}
+			}
+			//路径存入字符串
+			function printRoads(){
+				var N=roads.length;
+				for(var i=0;i<N;i++){
+					str+="("+(roads[i].x+1)+","+(roads[i].y+1)+")--";
+				}
+			}
+			//递归寻找路径
+			function Jump(horse,jumpX,jumpY,map){
+				horse.change(jumpX,jumpY);//跳一步
+				//先判断是否在棋盘内
+				if(inMap(horse)==false){
+					horse.change(-jumpX,-jumpY);
+					return -1;
+				}
+				//是否回到了起点
+				if(beg==false&&(horse.x==start.x&&horse.y==start.y)){
+					num++;
+					str+="路径"+num+":";
+					printRoads();
+					str+="("+(start.x+1)+","+(start.y+1)+")<br>";
+					horse.change(-jumpX,-jumpY);
+					return 0;
+				}
+				//是否走到了已经走过的点
+				if(map[horse.x][horse.y]==1){
+					horse.change(-jumpX,-jumpY);
+					return -1;
+				}else{
+					map[horse.x][horse.y]=1;
+				}
+				
+				beg=false;
+				roads.push(JSON.parse(JSON.stringify(horse)));//加入路径
+				//在此基础上跳新的一轮
+				for(var i=0;i<8;i++){
+					map1=JSON.parse(JSON.stringify(map));//保存当前的棋盘状态
+					Jump(horse,jump[i][0],jump[i][1],map1);
+				}
+				
+				roads.pop();//这里表示走完所有可能的路径仍未到达起始点,去掉这个点
+				horse.change(-jumpX,-jumpY);//退回上一个点
+				return 0;
+			}
+			//计算入口和显示
+			function result(){
+				var horse=new Point(start.x,start.y);
+				var map= new Array();
+				//创建棋盘状态数组
+				for(var i=0;i<mapX;i++){
+					var lin=new Array();
+					for(var j=0;j<mapY;j++){
+						lin[j]=0;
+					}
+					map[i]=lin.slice();
+				}
+				Jump(horse,0,0,map);
+				tar.innerHTML=str;//显示
+			}
+			//重置一些全局变量
+			function reset(){
+				num=0;
+				str="";
+				tar.innerHTML=str;
+				roads.splice(0,roads.length);
+				beg = true;
+			}
+			//得到用户输入
+			function setX(value){
+				mapX=value;
+				reset();
+			}
+			function setY(value){
+				mapY=value;
+				reset();
+			}
+			function setStartX(value){
+				start.x=value-1;
+				reset();
+			}
+			function setStartY(value){
+				start.y=value-1;
+				reset();
+			}
+		</script>
+	</body>
+</html>
