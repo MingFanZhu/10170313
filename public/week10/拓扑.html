@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>拓扑</title>
+		<style type="text/css">
+			.buttons {
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 12%;
+				width: 70px;
+				margin-left: 270px;
+			}
+			.buttons:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; width: 900px; text-align: center; background-color: cyan; font-family: '楷体';">拓扑生成算法</h1>
+		<p style="margin-right: 20px; float: right; font-style: italic;"><small>By 10170313</small></p>
+		<div style="width: 1002px; margin: 0 auto;">
+			<input type="file" id="fileIn" style="visibility: hidden; position: absolute;" onchange="getLines()">
+			<button type="button" class="buttons" onclick="fileIn.click()">加载</button>
+			<button type="button" class="buttons" onclick="main()">生成拓扑</button>
+		</div>
+		<div style="background-color: white; width: 802px; margin: 10px auto;">
+			<canvas id="map" width="800" height="600" style="background-color: white; border: 1px solid black;"></canvas>
+			<p id="nodes"></p>
+			<p id="lines"></p>
+			<p id="polygons"></p>
+		</div>
+
+		<script type="text/javascript">
+			//点类
+			function Point(x = 0, y = 0) {
+				this.x = x;
+				this.y = y;
+			}
+			//结点类
+			function Node(ID, point, lines) {
+				this.ID = ID;//ID
+				this.point = point;//点
+				this.lineIDs = lines;//关联的弧段ID
+			}
+			//弧段类
+			function Line(ID, nodeStart, nodeEnd, points, polygonLeft, polygonRight, lastNodeId, useTime) {
+				this.ID = ID;//ID
+				this.nodeStartId = nodeStart;//始结点
+				this.nodeEndId = nodeEnd;//末结点
+				this.points = points;//节点数组
+				this.polygonLeftId = polygonLeft;//左多边形
+				this.polygonRightId = polygonRight;//右多边形
+				//以下两个成员在左转算法中才用到
+				this.lastNodeId = lastNodeId;//上一次使用本弧段时用的结点ID,用于方向判断
+				this.useTime = useTime;//使用过的次数
+			}
+			//多边形类
+			function Polygon(ID, center, lines, island) {
+				this.ID = ID;//ID
+				this.center = center;//中心点
+				this.linesId = lines;//组成多边形的弧段ID数组
+				this.islandId = island;//内岛ID数组
+			}
+			//下标和角度,在结点关联的弧段排序时用到
+			function NumAngle(num, angle) {
+				this.num = num;
+				this.angle = angle;
+			}
+			//多边形ID和面积,在岛的处理时用到
+			function PolygonIdAndArea(ID, area) {
+				this.ID = ID;
+				this.area = area;
+			}
+			var Lines = new Array();//弧段数组
+			var Nodes = new Array();//结点数组
+			var Polygons = new Array();//多边形数组
+		</script>
+
+		<script type="text/javascript">
+			//获取数据存入弧段数组
+			function getLines() {
+				var file = document.getElementById('fileIn').files[0];
+				var reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str = reader.result;
+					var numcharacter = "";
+					var x = 0,
+						y = 0;
+					var flag = 0;
+					var number = 0;
+					var character = str[flag];
+					var pointTemp = new Point(0, 0);
+					var pointsTemp = new Array();
+					while (character != null) {
+						if (character == "E") {
+							flag += 5;
+							character = str[flag];
+						} else {
+							//弧段ID
+							while (character != "\n") {
+								numcharacter += character;
+								character = str[++flag];
+							}
+							number = parseInt(numcharacter);
+							numcharacter = "";
+							character = str[++flag];
+							while (character != "E") {
+								//节点x坐标
+								while (character != ",") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointTemp.x = parseFloat(numcharacter);
+								numcharacter = "";
+								//节点y坐标
+								while (character != "\n") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointTemp.y = parseFloat(numcharacter);
+								numcharacter = "";
+								pointsTemp.push(JSON.parse(JSON.stringify(pointTemp)));
+							}
+						}
+						var points = pointsTemp.slice();
+						var line = new Line(number, 0, 0, points, 0, 0, -1, 0);//初始化弧段,除ID和节点数组外都为初值
+						Lines.push(line);
+						pointsTemp.splice(0, pointsTemp.length);
+						flag += 5;
+						character = str[flag];
+					}
+					Lines.pop(); //消除最后一个END的影响
+				}
+			}
+			//主函数
+			function main() {
+				LinesAndNodes();
+				LinesSort();
+				TurnLeft();
+				Island();
+				PrintOut();
+				draw();
+			}
+			//弧段和结点关系
+			function LinesAndNodes() {
+				var N = Lines.length;
+				var j = 0;
+				var node = new Node();
+				for (var i = 0; i < N; i++) {
+					//始点收录情况
+					var num = IsInNodes(Lines[i].points[0]); 
+					if (num == -1) {
+						//始点未被收录到结点数组
+						node.ID = ++j; //id
+						node.point = Lines[i].points[0]; //点位
+						var lines = new Array(); //弧段ID链表
+						lines.push(Lines[i].ID);//加入弧段ID
+						node.lineIDs = lines.slice(); //拷贝入结点
+						Nodes.push(JSON.parse(JSON.stringify(node))); //加入结点链表
+						Lines[i].nodeStartId = node.ID; //线段始结点ID
+					} else {
+						//始点已被收录到结点数组
+						Nodes[num].lineIDs.push(Lines[i].ID);//加入关联弧段ID数组
+						Lines[i].nodeStartId = Nodes[num].ID; //线段始结点ID
+					}
+					//末点收录情况
+					num = IsInNodes(Lines[i].points[Lines[i].points.length - 1]);
+					if (num == -1) {
+						//末点未被收录到结点数组
+						node.ID = ++j; //id
+						node.point = Lines[i].points[Lines[i].points.length - 1]; //点位
+						var lines = new Array(); //弧段ID链表
+						lines.push(Lines[i].ID);//加入弧段ID
+						node.lineIDs = lines.slice(); //拷贝入结点
+						Nodes.push(JSON.parse(JSON.stringify(node))); //加入结点链表
+						Lines[i].nodeEndId = node.ID; //线段始结点ID
+					} else {
+						Nodes[num].lineIDs.push(Lines[i].ID); //加入关联弧段ID数组
+						Lines[i].nodeEndId = Nodes[num].ID; //线段始结点ID
+					}
+				}
+			}
+			//判断点是否在结点数组中
+			function IsInNodes(point) {
+				var N = Nodes.length;
+				var i = 0;
+				while (i < N) {
+					if ((point.x == Nodes[i].point.x) && (point.y = Nodes[i].point.y)) {
+						return i;
+					}
+					i++;
+				}
+				return -1;
+			}
+			//对结点关联的弧段排序
+			function LinesSort() {
+				var N = Nodes.length;
+				//单个结点
+				for (var i = 0; i < N; i++) {
+					var n = Nodes[i].lineIDs.length;
+					var NumAndAngles = new Array();//下标和角度数组
+					//结点关联弧段中的单个弧段
+					for (var j = 0; j < n; j++) {
+						var na = new NumAngle();//下标和角度对象
+						var line = SearchLineById(Nodes[i].lineIDs[j]);//由弧段ID获取弧段
+						var angle = 0;
+						//确定弧段的方向
+						if (line.nodeStartId == Nodes[i].ID) {
+							//弧段以当前结点为始点
+							angle = getAngle(line.points[0], line.points[1]);//获取角度
+						}else{
+							//弧段以当前结点为末点
+							angle = getAngle(line.points[line.points.length - 1], line.points[line.points.length - 2]);//获取角度
+						}
+						na.num = j;//存入下标
+						na.angle = angle;//存入角度
+						NumAndAngles.push(JSON.parse(JSON.stringify(na)));//存入数组
+					}
+					//按角度从小到大排序
+					NumAndAngles.sort(function(a, b) {
+						return a.angle - b.angle;
+					})
+					var linesTemp = Nodes[i].lineIDs.slice();//暂存当前结点关联弧段ID数组
+					//借助下标和角度数组中的原下标对ID重新排序
+					for (var k = 0; k < n; k++) {
+						Nodes[i].lineIDs[k] = linesTemp[NumAndAngles[k].num];
+					}
+				}
+			}
+			//按弧段ID获取弧段对象
+			function SearchLineById(ID) {
+				var N = Lines.length;
+				for (var i = 0; i < N; i++) {
+					if (Lines[i].ID == ID) {
+						return Lines[i];
+					}
+				}
+				return null;
+			}
+			//按结点ID获取结点对象
+			function SearchNodeById(ID) {
+				var N = Nodes.length;
+				for (var i = 0; i < N; i++) {
+					if (Nodes[i].ID == ID) {
+						return Nodes[i];
+					}
+				}
+				return null;
+			}
+			//按多边形ID获取多边形对象
+			function SearchPolygonById(ID) {
+				var N = Polygons.length;
+				for (var i = 0; i < N; i++) {
+					if (Polygons[i].ID == ID) {
+						return Polygons[i];
+					}
+				}
+				return null;
+			}
+			//计算角度
+			function getAngle(p0, p1) {
+				var dx = p1.x - p0.x;
+				var dy = p1.y - p0.y;
+				var a = 0;
+				if (dx == 0) {
+					if (dy > 0) {
+						a = Math.PI / 2;
+					} else {
+						a = 3 * Math.PI / 2;
+					}
+				} else {
+					if (dx > 0 && dy >= 0) {
+						a = Math.atan(Math.abs(dy / dx));
+					}
+					if (dx < 0 && dy >= 0) {
+						a = Math.PI - (Math.atan(Math.abs(dy / dx)));
+					}
+					if (dx < 0 && dy <= 0) {
+						a = Math.PI + (Math.atan(Math.abs(dy / dx)));
+					}
+					if (dx > 0 && dy < 0) {
+						a = 2 * Math.PI - (Math.atan(Math.abs(dy / dx)));
+					}
+				}
+				return a;
+			}
+			//左转算法
+			function TurnLeft() {
+				var N = Nodes.length;
+				var line = new Line();//初始化弧段对象
+				var nodeId = -1;//下一条弧段的另一个端点的结点ID
+				var beginNodeId = -1;//获取下一条弧段所使用的结点ID
+				var pol = new Polygon();//初始化多边形对象
+				var polygonLines = new Array();//组成多边形的弧段ID数组
+				//顺序寻找结点
+				for (var i = 0; i < N; i++) {
+					var n = Nodes[i].lineIDs.length;
+					//在当前结点的关联弧段中寻找使用次数为0或1并且上次使用方向与本次相反的弧段
+					for (var j = 0; j < n; j++) {
+						line = SearchLineById(Nodes[i].lineIDs[j]);
+						if (line.useTime < 2 && line.lastNodeId != Nodes[i].ID) {
+							beginNodeId = Nodes[i].ID;//初始化下一条弧段所使用的结点ID
+							nodeId = -1;//初始化下一条弧段的另一个端点的结点ID
+							break;
+						}
+					}
+					while (line.useTime < 2) {
+						//当当前弧段使用次数小于2时,即左右两侧多边形未全部生成时
+						while (nodeId != Nodes[i].ID) {
+							//下一条弧段的另一个端点的结点ID不等于起点时,即未回到原点
+							var anotherNodeId = 0;//弧段另一端结点ID
+							if (line.nodeStartId == line.nodeEndId) {
+								//单条弧段构成多边形的情况
+								line.useTime++;//该弧段使用次数+1
+								line.polygonLeftId = Polygons.length + 1;//岛的顺序相反所以是线段左侧
+								polygonLines.push(line.ID);//存入弧段ID数组
+								pol.ID = Polygons.length + 1;//多边形ID为当前多边形数组长度+1
+								pol.islandId = new Array();//初始化多边形内岛为ID数组
+								pol.linesId = polygonLines.slice();//拷贝弧段ID数组
+								polygonLines.splice(0, polygonLines.length);//清空弧段ID数组
+								Polygons.push(JSON.parse(JSON.stringify(pol)));//存入多边形数组
+								nodeId = line.nodeEndId;//单弧段按左转算法,下一条弧段还是它本身
+								continue;//跳出本次循环
+							}
+							if (line.nodeStartId == beginNodeId) {
+								//按弧段的原顺序
+								anotherNodeId = line.nodeEndId;//弧段的另一端结点ID
+								line.polygonRightId = Polygons.length + 1;//多边形在右侧
+							} else {
+								//按弧段的逆顺序
+								anotherNodeId = line.nodeStartId;
+								line.polygonLeftId = Polygons.length + 1;//多边形在左侧
+							}
+							polygonLines.push(line.ID);//存入弧段ID数组
+							line.useTime++;//使用次数变化
+							line.lastNodeId = beginNodeId;//记录本次使用时的顺序
+							var anotherNode = SearchNodeById(anotherNodeId);//弧段另一端结点
+							var nextLine = new Line();//下一条弧段
+							if (line.ID == anotherNode.lineIDs[anotherNode.lineIDs.length - 1]) {
+								//若本弧段已是另一个结点关联弧段的最后一个,取初始的弧段
+								nextLine = SearchLineById(anotherNode.lineIDs[0]);
+							} else {
+								//若本弧段不是另一个结点关联弧段的最后一个,按顺序取下一条弧段
+								var k = 0;
+								var nl = anotherNode.lineIDs.length;
+								for (k = 0; k < nl; k++) {
+									if (anotherNode.lineIDs[k] == line.ID) {
+										break;
+									}
+								}
+								nextLine = SearchLineById(anotherNode.lineIDs[k + 1]);
+							}
+							beginNodeId = anotherNodeId;//获取弧段所使用的的结点ID
+							line = nextLine;//指向下一弧段
+							//下一弧段的另一端点结点ID
+							if (nextLine.nodeStartId == anotherNodeId) {
+								nodeId = nextLine.nodeEndId;
+							} else {
+								nodeId = nextLine.nodeStartId;
+							}
+						}
+						//回到多边形起始点后,按使用顺序确定多边形在哪一侧并更新当前弧段的上次使用顺序
+						if (line.nodeEndId == Nodes[i].ID) {
+							line.polygonRightId = Polygons.length + 1;
+							line.lastNodeId = line.nodeStartId;
+						} else {
+							line.polygonLeftId = Polygons.length + 1;
+							line.lastNodeId = line.nodeEndId;
+						}
+						polygonLines.push(line.ID);//存入弧段ID数组
+						line.useTime++;
+						pol.ID = Polygons.length + 1;
+						pol.islandId = new Array();
+						pol.linesId = polygonLines.slice();
+						polygonLines.splice(0, polygonLines.length);
+						Polygons.push(JSON.parse(JSON.stringify(pol)));//存入多边形数组
+						//上次生成多边形的最后一条弧段
+						line = SearchLineById(Polygons[Polygons.length - 1].linesId[Polygons[Polygons.length - 1].linesId.length - 1]);
+						//避免出现一开始就判断回到多边形起点的情况
+						if (line.nodeStartId == Nodes[i].ID) {
+							nodeId = line.nodeEndId;
+						} else {
+							nodeId = line.nodeStartId;
+						}
+						beginNodeId = Nodes[i].ID;//获取弧段所用的点必为多边形起点
+					}
+				}
+			}
+			//岛的判断
+			function Island() {
+				var N = Polygons.length;
+				var PidAndAreas = new Array();//多边形和面积数组
+				var PaPlus = new Array();//正多边形数组
+				var PaMinus = new Array();//负多边形数组
+				//对单个多边形计算面积,并剔除因岛生成的错误正多边形
+				for (var i = 0; i < N; i++) {
+					var n1 = Polygons[i].linesId.length;
+					var area = 0;
+					//计算面积
+					for (var j = 0; j < n1; j++) {
+						var line = SearchLineById(Polygons[i].linesId[j]);
+						var n2 = line.points.length - 1;
+						//根据面在线的左右确定线上的点的顺序
+						if (line.polygonRightId == Polygons[i].ID) {
+							for (var k = 0; k < n2; k++) {
+								var temp = (line.points[k + 1].y + line.points[k].y) * (line.points[k + 1].x - line.points[k].x);
+								area += temp;
+							}
+						} else {
+							for (var k = n2; k > 0; k--) {
+								var temp = (line.points[k - 1].y + line.points[k].y) * (line.points[k - 1].x - line.points[k].x);
+								area += temp;
+							}
+						}
+					}
+					//单弧段多边形,剔除错误的正多边形
+					if (n1 == 1 && area > 0) {
+						Polygons.splice(i, 1);
+						N--;
+						i--;
+						continue;
+					}
+					//多弧段岛,剔除错误的正多边形
+					if ((i > 1) && (n1 == Polygons[i - 1].linesId.length && area > 0)) {
+						//面积为正且前一个多边形和本多边形组成弧段数相同的多边形
+						var lineIdsBefore = Polygons[i - 1].linesId;//前一个多边形
+						var lineIdsAfter = Polygons[i].linesId;//本多边形
+						var theSame = true;
+						//判断两个多边形的组成线段是否相同
+						for (var ib = 0; ib < lineIdsBefore.length; ib++) {
+							var oncesanme = false;
+							for (var ia = 0; ia < lineIdsAfter.length; ia++) {
+								if (lineIdsAfter[ia] == lineIdsBefore[ib]) {
+									oncesanme = true;
+								}
+							}
+							if (oncesanme == false) {
+								theSame = false;
+							}
+						}
+						//相同则剔除本多边形
+						if (theSame == true) {
+							Polygons.splice(i, 1);
+							N--;
+							i--;
+							continue;
+						}
+					}
+					area = area / 2;
+					var pa = new PolygonIdAndArea();
+					pa.ID = Polygons[i].ID;
+					pa.area = area;
+					PidAndAreas.push(pa);//存入多边形和面积数组
+				}
+				//形成正负多边形数组
+				for (var i = 0; i < N; i++) {
+					if (PidAndAreas[i].area > 0) {
+						PaPlus.push(JSON.parse(JSON.stringify(PidAndAreas[i])));
+					} else {
+						PaMinus.push(JSON.parse(JSON.stringify(PidAndAreas[i])));
+					}
+				}
+				PidAndAreas.splice(0, PidAndAreas.length);
+				//只有一个负多边形时退出
+				if (PaMinus.length == 1) {
+					return 0;
+				}
+				var np = PaPlus.length;
+				//顺序选择正多边形
+				for (var i = 0; i < np; i++) {
+					//获取正多边形边界点
+					var pol = SearchPolygonById(PaPlus[i].ID);//获取多边形
+					var nPapLine = pol.linesId.length;
+					var ppoints = new Array();//正多边形边界点数组
+					for (var k = 0; k < nPapLine; k++) {
+						var line = SearchLineById(pol.linesId[k]);
+						var npoint = line.points.length - 1;
+						if (line.polygonRightId == PaPlus[i].ID) {
+							for (var j = 0; j < npoint; j++) {
+								ppoints.push(JSON.parse(JSON.stringify(line.points[j])));
+							}
+						} else {
+							for (var j = npoint; j > 0; j--) {
+								ppoints.push(JSON.parse(JSON.stringify(line.points[j])));
+							}
+						}
+					}
+					var point = ppoints[0];
+					ppoints.push(JSON.parse(JSON.stringify(point))); //存入正多边形边界点数组
+
+					var nm = PaMinus.length;
+					//顺序选取负多边形
+					for (var k = 0; k < nm; k++) {
+						//若负多边形面积大于正多边形则不可能被包含,退出
+						if (Math.abs(PaMinus[k].area) >= PaPlus[i].area) {
+							continue;
+						}
+						//获取负多边形边界点
+						var pol = SearchPolygonById(PaMinus[k].ID);
+						var nPamLine = pol.linesId.length;
+						var mpoints = new Array();//负多边形边界点数组
+						for (var k1 = 0; k1 < nPamLine; k1++) {
+							var line = SearchLineById(pol.linesId[k1]);
+							var npoint = line.points.length - 1;
+							if (line.polygonRightId == PaMinus[k].ID) {
+								for (var j1 = 0; j1 < npoint; j1++) {
+									mpoints.push(JSON.parse(JSON.stringify(line.points[j1])));
+								}
+							} else {
+								for (var j1 = npoint; j1 > 0; j1--) {
+									mpoints.push(JSON.parse(JSON.stringify(line.points[j1])));
+								}
+							}
+						}
+						var point = mpoints[0];
+						mpoints.push(JSON.parse(JSON.stringify(point))); //存入负多边形边界点数组
+						//正多边形最小外接矩形
+						var pxmin = ppoints[0].x,
+							pxmax = ppoints[0].x,
+							pymin = ppoints[0].y,
+							pymax = ppoints[0].y;
+						//负多边形最小外接矩形
+						var mxmin = mpoints[0].x,
+							mxmax = mpoints[0].x,
+							mymin = mpoints[0].y,
+							mymax = mpoints[0].y;
+						var nppoints = ppoints.length;
+						var nmpoints = mpoints.length;
+						for (var ip = 1; ip < nppoints; ip++) {
+							if (ppoints[ip].x < pxmin) {
+								pxmin = ppoints[ip].x;
+							}
+							if (ppoints[ip].x > pxmax) {
+								pxmax = ppoints[ip].x;
+							}
+							if (ppoints[ip].y < pymin) {
+								pymin = ppoints[ip].y;
+							}
+							if (ppoints[ip].y > pymax) {
+								pymax = ppoints[ip].y;
+							}
+						}
+						for (var im = 1; im < nmpoints; im++) {
+							if (mpoints[im].x < mxmin) {
+								mxmin = mpoints[im].x;
+							}
+							if (mpoints[im].x > mxmax) {
+								mxmax = mpoints[im].x;
+							}
+							if (mpoints[im].y < mymin) {
+								mymin = mpoints[im].y;
+							}
+							if (mpoints[im].y > mymax) {
+								mymax = mpoints[im].y;
+							}
+						}
+						//若负多边形最小外接矩形不在正多边形最小外接矩形内部或相交则不可能被包含,退出
+						if (!(mxmin >= pxmin && mxmax <= pxmax && mymin >= pymin && mymax <= pymax)) {
+							continue;
+						}
+						//判断负多边形的每个点是否都在正多边形内,是则被包含
+						var isOut = false;//在正多边形外,初值为假
+						//转角法判断点是否在多边形内
+						for (var im = 0; im < nmpoints; im++) {
+							var wn = 0;
+							for (var ip = 0; ip < nppoints - 1; ip++) {
+								//从下到上的线段,下端包含,上端不包含
+								if (ppoints[ip].y <= mpoints[im].y && ppoints[ip + 1].y > mpoints[im].y) {
+									//点需在线段端点左侧
+									if (mpoints[im].x < ppoints[ip].x && mpoints[im].x < ppoints[ip + 1].x) {
+										wn++;
+									}
+								}
+								//从上到下的线段,上端包含,下端不包含
+								if (ppoints[ip].y > mpoints[im].y && ppoints[ip + 1].y <= mpoints[im].y) {
+									//点需在线段端点左侧
+									if (mpoints[im].x < ppoints[ip].x && mpoints[im].x < ppoints[ip + 1].x) {
+										wn--;
+									}
+								}
+							}
+							//只有wn为0时,点在多边形外部
+							if (wn == 0) {
+								isOut = true;
+								break;
+							}
+						}
+						//若有点在外部则不包含
+						if (isOut == true) {
+							continue;
+						} else {
+							//点都在内部,包含
+							var polygon = SearchPolygonById(PaPlus[i].ID);//外部的多边形
+							polygon.islandId.push(PaMinus[k].ID);//存入内岛ID数组
+							polygon = SearchPolygonById(PaMinus[k].ID);//内部的岛
+							var nl = polygon.linesId.length;
+							for (var m = 0; m < nl; m++) {
+								var line = SearchLineById(polygon.linesId[m]);//组成岛的弧段
+								//改写弧段的左右多边形信息,即去掉之前生成的错误的正多边形信息
+								if (line.polygonLeftId == polygon.ID) {
+									line.polygonRightId = PaPlus[i].ID;
+								} else {
+									line.polygonLeftId = PaPlus[i].ID;
+								}
+							}
+							//从负多边形数组内删除
+							PaMinus.splice(k, 1);
+							k--;
+							nm--;
+						}
+					}
+				}
+			}
+			//打印结果
+			function PrintOut() {
+				//结点信息
+				var nn = Nodes.length;
+				var obj = document.getElementById('nodes');
+				var str = "";
+				for (var i = 0; i < nn; i++) {
+					str += "结点ID：" + Nodes[i].ID +"  结点关联的弧段ID：";
+					var nl = Nodes[i].lineIDs.length;
+					for (var j = 0; j < nl; j++) {
+						str += Nodes[i].lineIDs[j] + "  ";
+					}
+					str += "<br>";
+				}
+				obj.innerHTML = str;
+				//弧段信息
+				var nl = Lines.length;
+				obj = document.getElementById('lines');
+				str = "";
+				for (var i = 0; i < nl; i++) {
+					str += "弧段ID：" + Lines[i].ID + "  弧段始结点ID：" + Lines[i].nodeStartId + "  弧段末结点ID：" + Lines[i].nodeEndId +
+						"  弧段左多边形ID：" + Lines[i].polygonLeftId + "  弧段右多边形ID：" + Lines[i].polygonRightId + "<br>";
+				}
+				obj.innerHTML = str;
+				//多边形信息
+				var np = Polygons.length;
+				obj = document.getElementById('polygons');
+				str = "";
+				for (var i = 0; i < np; i++) {
+					str += "多边形ID：" + Polygons[i].ID + "  多边形关联的弧段ID：";
+					var nl = Polygons[i].linesId.length;
+					for (var j = 0; j < nl; j++) {
+						str += Polygons[i].linesId[j] + "  ";
+					}
+					if (Polygons[i].islandId.length > 0) {
+						var ni = Polygons[i].islandId.length;
+						str += "多边形内岛ID："
+						for (var k = 0; k < ni; k++) {
+							str += Polygons[i].islandId[k] + "  ";
+						}
+					}
+					str += "<br>";
+				}
+				obj.innerHTML = str;
+			}
+			//绘制图像
+			function draw() {
+				var canva = document.getElementById('map');
+				var cxt = canva.getContext('2d');
+
+				var vary = {
+					scale: 0, //缩放比例
+					moveX: 0, //X轴移动长度
+					moveY: 0 //Y轴移动长度
+				}
+				//计算缩放比例和平移量
+				var nl = Lines.length;
+				var xmin = Lines[0].points[0].x,
+					xmax = Lines[0].points[0].x,
+					ymin = Lines[0].points[0].y,
+					ymax = Lines[0].points[0].y;
+				for (var i = 0; i < nl; i++) {
+					var np = Lines[i].points.length;
+					for (var j = 0; j < np; j++) {
+						if (Lines[i].points[j].x < xmin) {
+							xmin = Lines[i].points[j].x;
+						}
+						if (Lines[i].points[j].x > xmax) {
+							xmax = Lines[i].points[j].x;
+						}
+						if (Lines[i].points[j].y < ymin) {
+							ymin = Lines[i].points[j].y;
+						}
+						if (Lines[i].points[j].y > ymax) {
+							ymax = Lines[i].points[j].y;
+						}
+					}
+				}
+				var scaleX = canva.width / (xmax - xmin);
+				var scaleY = canva.height / (ymax - ymin);
+				if (scaleX < scaleY) {
+					vary.scale = scaleX;
+					var dy = (ymax - ymin) * scaleX;
+					var upY = (canva.height - dy) / 2 / scaleX;
+					vary.moveX = -xmin;
+					vary.moveY = -ymin + upY;
+				} else {
+					vary.scale = scaleY;
+					var dx = (xmax - xmin) * scaleY;
+					var upX = (canva.width - dx) / 2 / scaleY;
+					vary.moveX = -xmin + upX;
+					vary.moveY = -ymin;
+				}
+				//使用弧段的节点绘制
+				for (var i = 0; i < nl; i++) {
+					var np = Lines[i].points.length;
+					cxt.beginPath();
+					var xt = (Lines[i].points[0].x + vary.moveX) * vary.scale;
+					var yt = canva.height - (Lines[i].points[0].y + vary.moveY) * vary.scale;
+					cxt.moveTo(xt, yt);
+					for (var j = 1; j < np; j++) {
+						xt = (Lines[i].points[j].x + vary.moveX) * vary.scale;
+						yt = canva.height - (Lines[i].points[j].y + vary.moveY) * vary.scale;
+						cxt.lineTo(xt, yt);
+					}
+					cxt.stroke();
+				}
+				//标注结点ID
+				var nn = Nodes.length;
+				cxt.font = "5px";
+				for (var i = 0; i < nn; i++) {
+					var xt = (Nodes[i].point.x + vary.moveX) * vary.scale;
+					var yt = canva.height - (Nodes[i].point.y + vary.moveY) * vary.scale;
+					if (Math.abs(xt - canva.width) < 10) {
+						cxt.fillText("N" + Nodes[i].ID, xt - 15, yt + 5);
+					} else {
+						cxt.fillText("N" + Nodes[i].ID, xt + 5, yt + 5);
+					}
+				}
+				//标注多边形ID
+				var np = Polygons.length;
+				//计算多边形中心
+				for(var i=0;i<np;i++){
+					var nl=Polygons[i].linesId.length;
+					var line=SearchLineById(Polygons[i].linesId[0]);
+					var xmin=line.points[0].x,xmax=line.points[0].x,ymin=line.points[0].y,ymax=line.points[0].y;
+					for(var j=0;j<nl;j++){
+						line=SearchLineById(Polygons[i].linesId[j]);
+						var npoints=line.points.length;
+						for(var k=0;k<npoints;k++){
+							if(line.points[k].x<xmin){
+								xmin=line.points[k].x;
+							}
+							if(line.points[k].x>xmax){
+								xmax=line.points[k].x;
+							}
+							if(line.points[k].y<ymin){
+								ymin=line.points[k].y;
+							}
+							if(line.points[k].y>ymax){
+								ymax=line.points[k].y;
+							}
+						}
+					}
+					var point=new Point((xmin+xmax)/2,(ymin+ymax)/2);
+					Polygons[i].center=JSON.parse(JSON.stringify(point));
+				}
+				//标注
+				for (var i = 0; i < np; i++) {
+					var xt = (Polygons[i].center.x + vary.moveX) * vary.scale;
+					var yt = canva.height - (Polygons[i].center.y + vary.moveY) * vary.scale;
+					cxt.fillText("A" + Polygons[i].ID, xt, yt);
+				}
+			}
+		</script>
+	</body>
+</html>
