@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>地图符号绘制</title>
+		<style type="text/css">
+			.butts {
+				background-color: white;
+				border: 2px solid cyan;
+				border-radius: 12%;
+				width: 70px;
+				margin-left: 150px;
+			}
+			
+			.butts:hover {
+				background-color: aquamarine;
+				color: white;
+				box-shadow: 0 12px 16px 0 rgba(0, 0, 0, 0.24);
+			}
+			
+			.radios {
+				background-color: white;
+				margin-left: 150px;
+			}
+		</style>
+	</head>
+	<body bgcolor="azure">
+		<h1 style="margin: 10px auto; width: 900px; text-align: center; background-color: cyan; font-family: '楷体';">地图符号绘制</h1>
+		<p style="margin-right: 20px; float: right; font-style: italic;"><small>By 10170313</small></p>
+		<div style="width: 1002px; margin: 0 auto;">
+			<input type="file" id="fileIn" style="visibility: hidden; position: absolute;" onchange="getLayer()">
+			<button type="button" class="butts" onclick="fileIn.click()">传入图层</button>
+			<button type="button" class="butts" onclick="clearMap()">清除</button>
+			<input type="radio" class="radios" name="type" value="build" onclick="setType(this.value)">建筑
+			<input type="radio" class="radios" name="type" value="vegrgn" onclick="setType(this.value)">绿地
+		</div>
+		<div style="width: 802px; margin: 10px auto;">
+			<canvas id="map" width="800" height="600" style="background-color: white; border: 1px solid black;"></canvas>
+		</div>
+
+		<script type="text/javascript">
+			//地图点
+			function Point(x, y) {
+				this.x = x;
+				this.y = y;
+			}
+			//面对象,包括了编号和点坐标数组
+			function Polygon(number, points) {
+				this.number = number;
+				this.points = points;
+			}
+			//图层
+			function Layer(type,polygons) {
+				this.type=type;//填充类型
+				this.polygons = polygons;//面数组
+			}
+			//缩放和移动
+			function Vary(scale = 0, moveX = 0, moveY = 0) {
+				this.scale = scale;
+				this.moveX = moveX;
+				this.moveY = moveY;
+			}
+			
+			var Type="";
+			var layers = new Array();//图层数组
+			var vary = new Vary(0, 0, 0);
+			var canva = document.getElementById('map');
+			var cxt = canva.getContext('2d');
+			cxt.lineWidth = 0.2;
+		</script>
+
+		<script type="text/javascript">
+			//传入一个文件作为图层,并存入图层数组
+			function getLayer() {
+				var file = document.getElementById('fileIn').files[0];
+				var reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = function(e) {
+					var str = reader.result;
+					var numcharacter = "";
+					var x = 0,
+						y = 0;
+					var flag = 0;
+					var number = 0;
+					var character = str[flag];
+					var pointTemp = new Point(0, 0);//单点暂存
+					var pointsTemp = new Array();//暂存点数组
+					var polygonsTemp = new Array();//暂存面数组
+					while (character != null) {
+						if (character == "E") {
+							flag += 5;
+							character = str[flag];
+						} else {
+							//读取面编号
+							while (character != "\n") {
+								numcharacter += character;
+								character = str[++flag];
+							}
+							number = parseInt(numcharacter);
+							numcharacter = "";
+							character = str[++flag];
+							while (character != "E") {
+								//单点的x坐标
+								while (character != ",") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointTemp.x = parseFloat(numcharacter);
+								numcharacter = "";
+								//单点的y坐标
+								while (character != "\n") {
+									numcharacter += character;
+									character = str[++flag];
+								}
+								character = str[++flag];
+								pointTemp.y = parseFloat(numcharacter);
+								numcharacter = "";
+								pointsTemp.push(JSON.parse(JSON.stringify(pointTemp)));//存入暂存点数组
+							}
+						}
+						var points = pointsTemp.slice();//转存点数组
+						var polygon = new Polygon(number, points);//生成单面
+						polygonsTemp.push(polygon);//存入暂存面数组
+						pointsTemp.splice(0, pointsTemp.length);//清空暂存点数组
+						flag += 5;
+						character = str[flag];
+					}
+					polygonsTemp.pop(); //消除最后一个END的影响
+					var polygons = JSON.parse(JSON.stringify(polygonsTemp));//转存面数组
+					var layer = new Layer(Type,polygons);//生成单个图层
+					layers.push(layer);//存入图层数组
+					draw(); //绘制
+				}
+			}
+			
+			function setType(value){
+				Type=value;
+			}
+			//绘制函数
+			function draw() {
+				cxt.clearRect(0, 0, canva.width, canva.height);
+				getVary();//得到画布的缩放和平移参数
+				var N = layers.length;
+				for (var i = 0; i < N; i++) {
+					//依据图层的填充类型设置线的颜色和填充颜色
+					if(layers[i].type=="build"){
+						cxt.strokeStyle="black";
+					}
+					if(layers[i].type=="vegrgn"){
+						cxt.strokeStyle="green";
+						cxt.fillStyle="green";
+					}
+					var n1 = layers[i].polygons.length;
+					//单个面绘制
+					for (var j = 0; j < n1; j++) {
+						var n2 = layers[i].polygons[j].points.length;
+						cxt.beginPath();
+						var xt = (layers[i].polygons[j].points[0].x + vary.moveX) * vary.scale;
+						var yt = canva.height - (layers[i].polygons[j].points[0].y + vary.moveY) * vary.scale;
+						cxt.moveTo(xt, yt);
+						//单个线绘制
+						for (var k = 1; k < n2; k++) {
+							var xt = (layers[i].polygons[j].points[k].x + vary.moveX) * vary.scale;
+							var yt = canva.height - (layers[i].polygons[j].points[k].y + vary.moveY) * vary.scale;
+							cxt.lineTo(xt, yt);
+						}
+						cxt.stroke();
+						cxt.beginPath();
+						//依据图层的填充类型填充单个面
+						if(layers[i].type=="build") {
+							builds(layers[i].polygons[j].points);
+						}
+						if(layers[i].type=="vegrgn") {
+							vegrgn(layers[i].polygons[j].points);
+						}
+					}
+				}
+			}
+
+			//根据传入的地图点确定缩放的比例和平移长度
+			function getVary() {
+				var N = layers.length;
+				var xMin = layers[0].polygons[0].points[0].x
+				var yMin = layers[0].polygons[0].points[0].y;
+				var xMax = layers[0].polygons[0].points[0].x;
+				var yMax = layers[0].polygons[0].points[0].y;
+				//获取最小外接矩形
+				for (var i = 0; i < N; i++) {
+					var n1 = layers[i].polygons.length;
+					for (var j = 0; j < n1; j++) {
+						var n2 = layers[i].polygons[j].points.length;
+						for (var k = 0; k < n2; k++) {
+							if (layers[i].polygons[j].points[k].x < xMin) {
+								xMin = layers[i].polygons[j].points[k].x;
+							}
+							if (layers[i].polygons[j].points[k].x > xMax) {
+								xMax = layers[i].polygons[j].points[k].x;
+							}
+							if (layers[i].polygons[j].points[k].y < yMin) {
+								yMin = layers[i].polygons[j].points[k].y;
+							}
+							if (layers[i].polygons[j].points[k].y > yMax) {
+								yMax = layers[i].polygons[j].points[k].y;
+							}
+						}
+					}
+				}
+				//分别计算xy方向的缩放比例
+				var scaleX = canva.width / (xMax - xMin);
+				var scaleY = canva.height / (yMax - yMin);
+				//选取合适的缩放比例,计算平移量
+				if (scaleX < scaleY) {
+					vary.scale = scaleX;
+					var dy = (yMax - yMin) * scaleX;
+					var upY = (canva.height - dy) / 2 / scaleX;
+					vary.moveX = -xMin;
+					vary.moveY = -yMin + upY;
+				} else {
+					vary.scale = scaleY;
+					var dx = (xMax - xMin) * scaleY;
+					var upX = (canva.width - dx) / 2 / scaleY;
+					vary.moveX = -xMin + upX;
+					vary.moveY = -yMin;
+				}
+			}
+			//建筑类型的单个面填充
+			function builds(points) {
+				var dis = 5/vary.scale;//计算水平线间隔
+				var pointsRevolved = revolve(points, (Math.PI / 4));//逆时针旋转45°
+				var pointsSmall = getInPolygon(pointsRevolved);//获取与传入面边界平行的内部面的边界
+				//内部面的上下顶点
+				var yMin = pointsSmall[0].y,
+					yMax = pointsSmall[0].y;
+				for (var i = 1; i < pointsRevolved.length; i++) {
+					if (pointsRevolved[i].y > yMax) {
+						yMax = pointsRevolved[i].y;
+					}
+					if (pointsRevolved[i].y < yMin) {
+						yMin = pointsRevolved[i].y;
+					}
+				}
+
+				var lineY = yMin;//用于截断的水平线lineY
+				var linePointsRevolved = new Array();//旋转后的面与水平线的交点数组
+				//得到交点数组
+				while (lineY < yMax) {
+					var N = pointsRevolved.length - 1;
+					for (var i = 0; i < N; i++) {
+						var through = (pointsRevolved[i].y - lineY) * (pointsRevolved[i + 1].y - lineY);//线段是否过水平线
+						if (through < 0) {
+							var point = getIntersectionPoint(pointsRevolved[i], pointsRevolved[i + 1], lineY);//计算交点
+							linePointsRevolved.push(JSON.parse(JSON.stringify(point)));
+						}
+					}
+					lineY += dis;//移动水平线
+				}
+				//对交点排序,y是第一条件,x是第二条件
+				linePointsRevolved.sort(function(a, b) {
+					if (a.y != b.y) {
+						return a.y - b.y;
+					} else {
+						return a.x - b.x;
+					}
+				})
+
+				var linePoints = revolve(linePointsRevolved, (-Math.PI / 4));//将交点数组顺时针旋转45°
+				//把交点连线
+				cxt.beginPath();
+				var xt = 0;
+				var yt = 0;
+				var n = linePoints.length - 1;
+				for (var i = 0; i < n; i += 2) {
+					xt = (linePoints[i].x + vary.moveX) * vary.scale;
+					yt = canva.height - (linePoints[i].y + vary.moveY) * vary.scale;
+					cxt.moveTo(xt, yt);
+					xt = (linePoints[i + 1].x + vary.moveX) * vary.scale;
+					yt = canva.height - (linePoints[i + 1].y + vary.moveY) * vary.scale;
+					cxt.lineTo(xt, yt);
+					cxt.stroke();
+					cxt.beginPath();
+				}
+			}
+			//绿地类型的单个面填充
+			function vegrgn(points) {
+				var dis = 5/vary.scale;//计算水平线间隔
+				var pointsSmall = getInPolygon(points);//内部面
+				//内部面的上下顶点
+				var yMin = pointsSmall[0].y,
+					yMax = pointsSmall[0].y;
+				for (var i = 1; i < points.length; i++) {
+					if (points[i].y > yMax) {
+						yMax = points[i].y;
+					}
+					if (points[i].y < yMin) {
+						yMin = points[i].y;
+					}
+				}
+
+				var lineY = yMin;//水平线
+				var linePoints = new Array();
+				//得到交点数组
+				while (lineY < yMax) {
+					var N = points.length - 1;
+					for (var i = 0; i < N; i++) {
+						var through = (points[i].y - lineY) * (points[i + 1].y - lineY);
+						if (through < 0) {
+							var point = getIntersectionPoint(points[i], points[i + 1], lineY);
+							linePoints.push(JSON.parse(JSON.stringify(point)));
+						}
+					}
+					lineY += dis;
+				}
+				//排序
+				linePoints.sort(function(a, b) {
+					if (a.y != b.y) {
+						return a.y - b.y;
+					} else {
+						return a.x - b.x;
+					}
+				})
+				//在交点的水平连线上间隔一定距离填充矩形
+				var xt = 0;
+				var yt = 0;
+				var n = linePoints.length - 1;
+				for (var i = 0; i < n; i += 2) {
+					xt = (linePoints[i].x + vary.moveX) * vary.scale;
+					yt = canva.height - (linePoints[i].y + vary.moveY) * vary.scale;
+					var pointLeft = new Point(xt, yt);
+					xt = (linePoints[i + 1].x + vary.moveX) * vary.scale;
+					yt = canva.height - (linePoints[i + 1].y + vary.moveY) * vary.scale;
+					var pointRight = new Point(xt, yt);
+					var x = pointLeft.x;
+					while (x < pointRight.x) {
+						cxt.fillRect(x, yt, 1, 1);
+						x += 6;
+					}
+				}
+			}
+			//旋转函数
+			function revolve(points, angle) {
+				var N = points.length;
+				var pointsRevolved = new Array();
+				for (var i = 0; i < N; i++) {
+					var X = points[i].x * Math.cos(angle) - points[i].y * Math.sin(angle);
+					var Y = points[i].x * Math.sin(angle) + points[i].y * Math.cos(angle);
+					var poi = new Point(X, Y);
+					pointsRevolved.push(JSON.parse(JSON.stringify(poi)));
+				}
+				return pointsRevolved;
+			}
+			//获取内部面,平行线算法
+			function getInPolygon(points) {
+				var dis = 1;//内部面与外边界的间隔
+				var pointsSmall = new Array();
+				//计算第一条线段的斜率
+				if (points[1].x - points[0].x != 0) {
+					var K = (points[1].y - points[0].y) / (points[1].x - points[0].x);
+				} else {
+					K = NaN;
+				}
+				var KTemp = K;//上一条线段的斜率
+				var K1 = K;//第一条线段的斜率
+				var A = Math.abs(Math.atan(K));//斜率的角度
+				//不同情况下线段起始端点向内部dis距离的点
+				if (K >= 0 && (points[1].x - points[0].x > 0)) {
+					var X = points[0].x + dis * Math.cos(Math.PI / 2 - A);
+					var Y = points[0].y - dis * Math.sin(Math.PI / 2 - A);
+				}
+				if (K >= 0 && (points[1].x - points[0].x < 0)) {
+					var X = points[0].x - dis * Math.cos(Math.PI / 2 - A);
+					var Y = points[0].y + dis * Math.sin(Math.PI / 2 - A);
+				}
+				if (K < 0 && (points[1].x - points[0].x > 0)) {
+					var X = points[0].x - dis * Math.cos(Math.PI / 2 - A);
+					var Y = points[0].y - dis * Math.sin(Math.PI / 2 - A);
+				}
+				if (K < 0 && (points[1].x - points[0].x < 0)) {
+					var X = points[0].x + dis * Math.cos(Math.PI / 2 - A);
+					var Y = points[0].y + dis * Math.sin(Math.PI / 2 - A);
+				}
+				if ((points[1].x - points[0].x == 0) && (points[1].y - points[0].y > 0)) {
+					var X = points[0].x + dis;
+					var Y = points[0].y;
+				}
+				if ((points[1].x - points[0].x == 0) && (points[1].y - points[0].y < 0)) {
+					var X = points[0].x - dis;
+					var Y = points[0].y;
+				}
+				var pointTemp = new Point(X, Y);
+				pointsSmall.push(JSON.parse(JSON.stringify(pointTemp)));//存入数组
+
+				var N = points.length;
+				//对每一条边求起始端点向内部dis距离的点
+				for (var i = 1; i < N - 1; i++) {
+					if (points[i + 1].x - points[i].x != 0) {
+						K = (points[i + 1].y - points[i].y) / (points[i + 1].x - points[i].x);
+					} else {
+						K = NaN;
+					}
+					var A = Math.abs(Math.atan(K));
+					if (K >= 0 && (points[i + 1].x - points[i].x > 0)) {
+						X = points[i].x + dis * Math.cos(Math.PI / 2 - A);
+						Y = points[i].y - dis * Math.sin(Math.PI / 2 - A);
+					}
+					if (K >= 0 && (points[i + 1].x - points[i].x < 0)) {
+						X = points[i].x - dis * Math.cos(Math.PI / 2 - A);
+						Y = points[i].y + dis * Math.sin(Math.PI / 2 - A);
+					}
+					if (K < 0 && (points[i + 1].x - points[i].x > 0)) {
+						X = points[i].x - dis * Math.cos(Math.PI / 2 - A);
+						Y = points[i].y - dis * Math.sin(Math.PI / 2 - A);
+					}
+					if (K < 0 && (points[i + 1].x - points[i].x < 0)) {
+						X = points[i].x + dis * Math.cos(Math.PI / 2 - A);
+						Y = points[i].y + dis * Math.sin(Math.PI / 2 - A);
+					}
+					if ((points[i + 1].x - points[i].x == 0) && (points[i + 1].y - points[i].y > 0)) {
+						X = points[i].x + dis;
+						Y = points[i].y;
+					}
+					if ((points[i + 1].x - points[i].x == 0) && (points[i + 1].y - points[i].y < 0)) {
+						X = points[i].x - dis;
+						Y = points[i].y;
+					}
+					//求上一条内部边和这一条内部边的交点,即准确的内部面的顶点
+					//本线段为竖直线时
+					if (isNaN(K) == true) {
+						pointTemp.x = X;
+						pointTemp.y = KTemp * pointTemp.x + pointsSmall[i - 1].y - KTemp * pointsSmall[i - 1].x;
+					}
+					//上条线段为竖直线时
+					if (isNaN(KTemp) == true) {
+						pointTemp.x = pointsSmall[i - 1].x;
+						pointTemp.y = K * pointTemp.x + Y - K * X;
+					}
+					//两线段均不为竖直线时
+					if (isNaN(K) == false && isNaN(KTemp) == false) {
+						pointTemp.x = (pointsSmall[i - 1].y - Y + K * X - KTemp * pointsSmall[i - 1].x) / (K - KTemp);
+						pointTemp.y = K * pointTemp.x + Y - K * X;
+					}
+					KTemp = K;
+					pointsSmall.push(JSON.parse(JSON.stringify(pointTemp)));
+				}
+				//求取最后一个顶点,也是第一个顶点,方法同上
+				if (isNaN(K1) == true) {
+					pointTemp.x = pointsSmall[0].x;
+					pointTemp.y = KTemp * pointTemp.x + pointsSmall[pointsSmall.length - 1].y - KTemp * pointsSmall[pointsSmall.length -
+						1].x;
+				}
+				if (isNaN(KTemp) == true) {
+					pointTemp.x = pointsSmall[pointsSmall.length - 1].x;
+					pointTemp.y = K1 * pointTemp.x + pointsSmall[1].y - K1 * pointsSmall[1].x;
+				}
+				if (isNaN(K1) == false && isNaN(KTemp) == false) {
+					pointTemp.x = (pointsSmall[pointsSmall.length - 1].y - pointsSmall[0].y + K1 * pointsSmall[0].x - KTemp *
+						pointsSmall[pointsSmall.length - 1].x) / (K1 - KTemp);
+					pointTemp.y = K1 * pointTemp.x + pointsSmall[0].y - K1 * pointsSmall[0].x;
+				}
+				pointsSmall.push(JSON.parse(JSON.stringify(pointTemp)));
+				pointsSmall[0] = JSON.parse(JSON.stringify(pointTemp));//更新第一个顶点
+				return pointsSmall;
+			}
+			//求水平线与线段的交点
+			function getIntersectionPoint(pointA, pointB, Y) {
+				var point = new Point(0, 0);
+				if (pointA.x == pointB.x) {
+					point.x = pointA.x;
+					point.y = Y;
+				} else {
+					var k = (pointB.y - pointA.y) / (pointB.x - pointA.x);
+					point.y = Y;
+					point.x = (Y - pointB.y + k * pointB.x) / k;
+				}
+				return point;
+			}
+			//清除画布和图层数据
+			function clearMap() {
+				cxt.clearRect(0, 0, canva.width, canva.height);
+				layers.splice(0, layers.length);
+			}
+		</script>
+	</body>
+</html>
