@@ -19,3 +19,5 @@
 [地图符号绘制](https://mz1094178787.github.io/10170313/public/week9/%E5%9C%B0%E5%9B%BE%E7%AC%A6%E5%8F%B7.html)
 ## 第十周的多边形拓扑生成<br>
 [多边形拓扑生成](https://mz1094178787.github.io/10170313/public/week10/%E6%8B%93%E6%89%91.html)
+## 第十一周的矢量数据栅格化<br>
+[矢量数据栅格化](https://mz1094178787.github.io/10170313/public/week11/%E7%9F%A2%E9%87%8F%E8%BD%AC%E6%A0%85%E6%A0%BC.html)
