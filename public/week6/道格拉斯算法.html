@@ -406,7 +406,7 @@
 				for (var i = 0; i < polygonsAfter.length; i++) {
 					numAfter += polygonsAfter[i].points.length;
 				}
-				comp = ((numBefore - numAfter) / numBefore * 100).toFixed(2);
+				comp = (numAfter / numBefore * 100).toFixed(2);
 
 				var obj = document.getElementById('compression');
 				obj.innerHTML = "压缩率：" + comp.toString() + " %";
