@@ -2,7 +2,10 @@
 <html>
 	<head>
 		<meta charset="utf-8">
-		<title>拓扑</title>
+		<meta name="keywords" content="矢量转栅格">
+		<meta name="author" content="南师大地科院10170313">
+		<meta name="description" content="2019_GIS算法基础_矢量转栅格">
+		<title>矢量转栅格</title>
 		<style type="text/css">
 			.buttons {
 				background-color: white;
@@ -22,6 +25,7 @@
 	<body bgcolor="azure">
 		<h1 style="margin: 10px auto; width: 900px; text-align: center; background-color: cyan; font-family: '楷体';">拓扑生成与面转栅格</h1>
 		<p style="margin-right: 20px; float: right; font-style: italic;"><small>By 10170313</small></p>
+		<p style="text-align: center;">请先生成拓扑再转为栅格，栅格内数据和图像在点击后生成</p>
 		<div style="width: 1002px; margin: 0 auto;">
 			<input type="file" id="fileIn" style="visibility: hidden; position: absolute;" onchange="getLines()">
 			<button type="button" class="buttons" onclick="fileIn.click()">加载</button>
@@ -33,9 +37,9 @@
 		<div style="background-color: white; width: 802px; margin: 10px auto;">
 			<canvas id="map" width="800" height="600" style="border: 1px solid black; position: absolute;"></canvas>
 			<canvas id="map2" width="800" height="600" style="background-color: white; border: 1px solid black;"></canvas>
-			<p id="nodes"></p>
-			<p id="lines"></p>
-			<p id="polygons"></p>
+		</div>
+		<div style=" width: 80%; margin: 0 auto;">
+			<p id="grid"></p>
 		</div>
 
 		<script type="text/javascript">
@@ -159,7 +163,6 @@
 				LinesSort();
 				TurnLeft();
 				Island();
-				PrintOut();
 				draw();
 			}
 			//弧段和结点关系
@@ -434,39 +437,6 @@
 							}
 						}
 					}
-					//单弧段多边形,剔除错误的正多边形
-					if (n1 == 1 && area > 0) {
-						Polygons.splice(i, 1);
-						N--;
-						i--;
-						continue;
-					}
-					//多弧段岛,剔除错误的正多边形
-					if ((i > 1) && (n1 == Polygons[i - 1].linesId.length && area > 0)) {
-						//面积为正且前一个多边形和本多边形组成弧段数相同的多边形
-						var lineIdsBefore = Polygons[i - 1].linesId; //前一个多边形
-						var lineIdsAfter = Polygons[i].linesId; //本多边形
-						var theSame = true;
-						//判断两个多边形的组成线段是否相同
-						for (var ib = 0; ib < lineIdsBefore.length; ib++) {
-							var oncesanme = false;
-							for (var ia = 0; ia < lineIdsAfter.length; ia++) {
-								if (lineIdsAfter[ia] == lineIdsBefore[ib]) {
-									oncesanme = true;
-								}
-							}
-							if (oncesanme == false) {
-								theSame = false;
-							}
-						}
-						//相同则剔除本多边形
-						if (theSame == true) {
-							Polygons.splice(i, 1);
-							N--;
-							i--;
-							continue;
-						}
-					}
 					area = area / 2;
 					var pa = new PolygonIdAndArea();
 					pa.ID = Polygons[i].ID;
@@ -648,51 +618,6 @@
 						}
 					}
 				}
-			}
-			//打印结果
-			function PrintOut() {
-				//结点信息
-				var nn = Nodes.length;
-				var obj = document.getElementById('nodes');
-				var str = "";
-				for (var i = 0; i < nn; i++) {
-					str += "结点ID：" + Nodes[i].ID + "  结点关联的弧段ID：";
-					var nl = Nodes[i].lineIDs.length;
-					for (var j = 0; j < nl; j++) {
-						str += Nodes[i].lineIDs[j] + "  ";
-					}
-					str += "<br>";
-				}
-				obj.innerHTML = str;
-				//弧段信息
-				var nl = Lines.length;
-				obj = document.getElementById('lines');
-				str = "";
-				for (var i = 0; i < nl; i++) {
-					str += "弧段ID：" + Lines[i].ID + "  弧段始结点ID：" + Lines[i].nodeStartId + "  弧段末结点ID：" + Lines[i].nodeEndId +
-						"  弧段左多边形ID：" + Lines[i].polygonLeftId + "  弧段右多边形ID：" + Lines[i].polygonRightId + "<br>";
-				}
-				obj.innerHTML = str;
-				//多边形信息
-				var np = Polygons.length;
-				obj = document.getElementById('polygons');
-				str = "";
-				for (var i = 0; i < np; i++) {
-					str += "多边形ID：" + Polygons[i].ID + "  多边形关联的弧段ID：";
-					var nl = Polygons[i].linesId.length;
-					for (var j = 0; j < nl; j++) {
-						str += Polygons[i].linesId[j] + "  ";
-					}
-					if (Polygons[i].islandId.length > 0) {
-						var ni = Polygons[i].islandId.length;
-						str += "多边形内岛ID："
-						for (var k = 0; k < ni; k++) {
-							str += Polygons[i].islandId[k] + "  ";
-						}
-					}
-					str += "<br>";
-				}
-				obj.innerHTML = str;
 			}
 			//绘制图像
 			function draw() {
@@ -892,6 +817,7 @@
 					grid[lineX-1][i] =grid[lineX-2][i];
 				}
 				printGrid(grid, GridSize, lineX, lineY, x0, y0);//绘制栅格
+				outGrid(grid)
 			}
 			//栅格绘制
 			function printGrid(grid, GridSize, lineX, lineY, x0, y0) {
@@ -999,6 +925,19 @@
 				} else {
 					return false;
 				}
+			}
+			
+			function outGrid(grid){
+				var res="";
+				for(var i=0;i<grid.length;i++){
+					for(var j=0;j<grid[0].length;j++){
+						res+=grid[i][j]+" ";
+					}
+					res+="<br>";
+				}
+				var obj=document.getElementById('grid');
+				obj.innerHTML=res;
+				scrollTo(0, document.documentElement.clientHeight);
 			}
 		</script>
 	</body>

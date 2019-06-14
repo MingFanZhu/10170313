@@ -2,6 +2,9 @@
 <html>
 	<head>
 		<meta charset="utf-8">
+		<meta name="keywords" content="拓扑">
+		<meta name="author" content="南师大地科院10170313">
+		<meta name="description" content="2019_GIS算法基础_拓扑">
 		<title>拓扑</title>
 		<style type="text/css">
 			.buttons {
@@ -419,39 +422,6 @@
 							}
 						}
 					}
-					//单弧段多边形,剔除错误的正多边形
-					if (n1 == 1 && area > 0) {
-						Polygons.splice(i, 1);
-						N--;
-						i--;
-						continue;
-					}
-					//多弧段岛,剔除错误的正多边形
-					if ((i > 1) && (n1 == Polygons[i - 1].linesId.length && area > 0)) {
-						//面积为正且前一个多边形和本多边形组成弧段数相同的多边形
-						var lineIdsBefore = Polygons[i - 1].linesId;//前一个多边形
-						var lineIdsAfter = Polygons[i].linesId;//本多边形
-						var theSame = true;
-						//判断两个多边形的组成线段是否相同
-						for (var ib = 0; ib < lineIdsBefore.length; ib++) {
-							var oncesanme = false;
-							for (var ia = 0; ia < lineIdsAfter.length; ia++) {
-								if (lineIdsAfter[ia] == lineIdsBefore[ib]) {
-									oncesanme = true;
-								}
-							}
-							if (oncesanme == false) {
-								theSame = false;
-							}
-						}
-						//相同则剔除本多边形
-						if (theSame == true) {
-							Polygons.splice(i, 1);
-							N--;
-							i--;
-							continue;
-						}
-					}
 					area = area / 2;
 					var pa = new PolygonIdAndArea();
 					pa.ID = Polygons[i].ID;
@@ -770,6 +740,7 @@
 					var yt = canva.height - (Polygons[i].center.y + vary.moveY) * vary.scale;
 					cxt.fillText("A" + Polygons[i].ID, xt, yt);
 				}
+				scrollTo(0, document.documentElement.clientHeight);
 			}
 		</script>
 	</body>

@@ -2,11 +2,14 @@
 <html>
 	<head>
 		<meta charset="utf-8">
+		<meta name="keywords" content="最佳工作序列">
+		<meta name="author" content="南师大地科院10170313">
+		<meta name="description" content="2019_GIS算法基础_最佳工作序列">
 		<title>最佳工作序列</title>
 		<style type="text/css">
 			.buts {
-				width: 50px;
-				margin-left: 260px;
+				width: 70px;
+				margin-left: 250px;
 				background-color: white;
 				border: 2px solid cyan;
 				border-radius: 12%;
@@ -23,9 +26,25 @@
 		<h1 style="margin: 10px auto; text-align: center; width: 900px; background-color: cyan; font-family: '楷体';">最佳工作序列</h1>
 		<p style="margin-right: 100px; float: right; display: block;"><small style="font-style: italic;">By 10170313</small></p>
 		<div style="width: 900px; margin: 0 auto;">
-			<input type="file" id="read" style="visibility: hidden; position: absolute;" onchange="getData()">
-			<button type="button" class="buts" onclick="read.click()">加载</button>
+			<button type="button" class="buts" onclick="addJob()">添加工作</button>
 			<button type="button" class="buts" onclick="getResult()">计算</button>
+			<p>已添加默认数据，用户可自行更改或点击按钮添加数据</p>
+		</div>
+		<div id="dynamicDiv" style="width: 900px; margin: 0 auto; ">
+			<p>工作1&emsp;&emsp;&emsp;&emsp;时间：<input style='width: 100px; margin-right: 70px;' type='number' name='time' value="4"><!--
+			-->期限：<input style='width: 100px; margin-right: 70px;' type='number' name='limit' value="10"><!--
+			-->价值：<input style='width: 100px; margin-right: 70px;' type='number' name='value' value="2"></p>
+			<p>工作2&emsp;&emsp;&emsp;&emsp;时间：<input style='width: 100px; margin-right: 70px;' type='number' name='time' value="3"><!--
+			-->期限：<input style='width: 100px; margin-right: 70px;' type='number' name='limit' value="8"><!--
+			-->价值：<input style='width: 100px; margin-right: 70px;' type='number' name='value' value="3"></p>
+			<p>工作3&emsp;&emsp;&emsp;&emsp;时间：<input style='width: 100px; margin-right: 70px;' type='number' name='time' value="2"><!--
+			-->期限：<input style='width: 100px; margin-right: 70px;' type='number' name='limit' value="4"><!--
+			-->价值：<input style='width: 100px; margin-right: 70px;' type='number' name='value' value="3"></p>
+			<p>工作4&emsp;&emsp;&emsp;&emsp;时间：<input style='width: 100px; margin-right: 70px;' type='number' name='time' value="1"><!--
+			-->期限：<input style='width: 100px; margin-right: 70px;' type='number' name='limit' value="2"><!--
+			-->价值：<input style='width: 100px; margin-right: 70px;' type='number' name='value' value="6"></p>
+		</div>
+		<div style="width: 900px; margin: 0 auto; ">
 			<p id="p1"></p>
 			<p id="p2"></p>
 		</div>
@@ -37,6 +56,7 @@
 				this.limit = l;
 				this.value = v;
 			}
+			var jobId=4;
 			var works = new Array(); //存储工作
 			var result = new Array(); //存储结果(工作的ID)
 			var used = new Array(); //工作是否已被存入结果的标识
@@ -45,67 +65,49 @@
 			var valueRestTemp = 0; //暂存剩余价值
 		</script>
 		<script type="text/javascript">
+			function addJob(){
+				var obj=document.getElementById('dynamicDiv');
+				var newP=document.createElement('p');
+				jobId++;
+				var inner="<p>工作"+jobId+"&emsp;&emsp;&emsp;&emsp;时间：<input style='width: 100px; margin-right: 70px;' type='number' name='time'>"+  
+				"期限：<input style='width: 100px; margin-right: 70px;' type='number' name='limit'>"+
+				"价值：<input style='width: 100px; margin-right: 70px;' type='number' name='value'></p>"
+				newP.innerHTML=inner;
+				obj.appendChild(newP);
+			}
+			
 			//获取数据并显示
 			function getData() {
 				//清除上一次的全局变量
-				works.slice(0, works.length);
-				result.slice(0, result.length);
-				used.slice(0, used.length);
+				works.splice(0, works.length);
+				result.splice(0, result.length);
+				used.splice(0, used.length);
 				time = 0;
 				valueRest = 0;
 				valueRestTemp = 0;
 				//读取数据
-				var file = document.getElementById('read').files[0];
-				var reader = new FileReader();
-				reader.readAsText(file);
-				reader.onload = function(e) {
-					var str = reader.result;
-					var flag = 0;
-					var num = "";
-					var character = str[flag];
-					var workTemp = new Work(0, 0, 0, 0);
-					var n = 1; //对应表中的四个字段
-					while (character != null) {
-						while (character != ' ' && character != '\n') {
-							num += character;
-							character = str[++flag];
-						}
-						if (n == 1) {
-							workTemp.ID = parseInt(num);
-							num = "";
-							character = str[++flag];
-						}
-						if (n == 2) {
-							workTemp.time = parseInt(num);
-							num = "";
-							character = str[++flag];
-						}
-						if (n == 3) {
-							workTemp.limit = parseInt(num);
-							num = "";
-							character = str[++flag];
-						}
-						if (n == 4) {
-							n = 0;
-							workTemp.value = parseInt(num);
-							num = "";
-							character = str[++flag];
-							works.push(JSON.parse(JSON.stringify(workTemp)));
-						}
-						n++;
-					}
-					var n = works.length;
-					var obj = document.getElementById('p1');
-					var data = "ID  工时  期限  价值<br>";
-					for (var i = 0; i < n; i++) {
-						used[i] = false;
-						data += works[i].ID + "  " + works[i].time + "  " + works[i].limit + "  " + works[i].value + "<br>";
-					}
-					obj.innerHTML = data; //显示读入的数据
-					//清除上一次的结果显示
-					var obj = document.getElementById('p2');
-					obj.innerHTML = "";
+				var times=document.getElementsByName('time');
+				var limits=document.getElementsByName('limit');
+				var values=document.getElementsByName('value');
+				var work=new Work(0,0,0,0);
+				for(var i=0;i<times.length;i++){
+					work.ID=i+1;
+					work.time=parseInt(times[i].value);
+					work.limit=parseInt(limits[i].value);
+					work.value=parseInt(values[i].value);
+					works.push(JSON.parse(JSON.stringify(work)));
 				}
+				var obj = document.getElementById('p1');
+				obj.innerHTML="";
+				var data = "ID  工时  期限  价值<br>";
+				for (var i = 0; i < works.length; i++) {
+					used[i] = false;
+					data += works[i].ID + "&emsp;" + works[i].time + "&emsp;" + works[i].limit + "&emsp;" + works[i].value + "<br>";
+				}
+				obj.innerHTML = data; //显示读入的数据
+				//清除上一次的结果显示
+				var obj = document.getElementById('p2');
+				obj.innerHTML = "";
 			}
 			//获取还未被放入结果的工作数
 			function restWork() {
@@ -176,6 +178,7 @@
 			}
 
 			function getResult() {
+				getData();
 				var value_all = 0; //总价值
 				for (var i = 0; i < works.length; i++) {
 					value_all += works[i].value;
@@ -184,9 +187,17 @@
 				order(value_all, 0); //找出工作序列
 				var obj = document.getElementById('p2');
 				var res = "";
-				res += "总工时：" + time + "    总价值：" + (value_all - valueRest) + "<br>工作顺序：<br>";
+				res += "总工时：" + time + "总价值：" + (value_all - valueRest) + "<br>工作顺序：<br>";
 				for (var i = 0; i < result.length; i++) {
-					res += result[i] + "  ";
+					res += result[i] + "&emsp;";
+				}
+				if(result.length<works.length){
+					res+="<br>不应进行的工作：<br>";
+					for(var i=0;i<used.length;i++){
+						if(used[i]==false){
+							res+=works[i].ID+"&emsp;";
+						}
+					}
 				}
 				obj.innerHTML = res; //显示结果
 			}
