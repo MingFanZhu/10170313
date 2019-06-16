@@ -37,7 +37,7 @@
 			<p id="compression" style="display: inline; margin-left: 70px;">压缩率： %</p>
 			<button type="button" disabled="disabled" class="buttons" name="radios" onclick="getAfterPolygons()">压缩</button>
 			<p style="display: inline; margin-left: 70px;">阈值：</p>
-			<input id="maxdis" type="text" value="3066" style="width: 70px;" onchange="setTolerance(this.value)">
+			<input id="maxdis" type="text" value="1791" style="width: 70px;" onchange="setTolerance(this.value)">
 			<input type="radio" disabled="disabled" class="radios" name="radios" value="before" checked="checked" onclick="setValue(this.value)">压缩前
 			<input type="radio" disabled="disabled" class="radios" name="radios" value="after" onclick="setValue(this.value)">压缩后
 		</div>
@@ -368,7 +368,7 @@
 				var distance = 0;
 				var temp = 0;
 				//获取最大距离
-				for (var i = start + 1; i < end - 1; i++) {
+				for (var i = start + 1; i < end; i++) {
 					var distemp = distanceToLine(points[start].x, points[start].y, points[end].x, points[end].y, points[i].x, points[i]
 						.y);//点到线的距离
 					if (distemp > distance) {
@@ -378,7 +378,7 @@
 				}
 				//最大距离小于阈值则全部舍去
 				if (distance <= tolerance) {
-					for (var i = start + 1; i < end - 1; i++) {
+					for (var i = start + 1; i < end; i++) {
 						points[i].del = true;
 					}
 					return 0;
