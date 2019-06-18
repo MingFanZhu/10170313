@@ -2,9 +2,6 @@
 <html>
 	<head>
 		<meta charset="utf-8">
-		<meta name="keywords" content="四叉树编码">
-		<meta name="author" content="南师大地科院10170313">
-		<meta name="description" content="2019_GIS算法基础_四叉树编码">
 		<title>四叉树编码</title>
 		<style type="text/css">
 			.buts{
@@ -159,8 +156,8 @@
 							var k=nextMor(i,codes[i].morton+2);
 							var l=nextMor(i,codes[i].morton+3);
 							if(j==-1||k==-1||l==-1){
-								//若其中有一个不存在,结束这一层的归并
-								i=N;
+								//若其中有一个不存在
+								i+=Math.pow(2,Math.log2(numbers.length)-lay)-1;
 							}else{
 								//都存在的情况下
 								if(codes[i].value==codes[j].value&&
